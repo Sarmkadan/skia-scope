@@ -1,39 +1,33 @@
+using System;
 using SkiaSharp;
 
 namespace SkiaScope;
 
 /// <summary>
-/// Base interface for all scope renderers.
+/// Represents a renderer capable of visualizing audio scope data.
 /// </summary>
 public interface IScopeRenderer
 {
     /// <summary>
-    /// Gets or sets the minimum decibel value for the display.
+    /// Pushes audio samples to the renderer.
     /// </summary>
-    float MinDb { get; set; }
+    /// <param name="samples">Audio samples to be rendered.</param>
+    void PushSamples(ReadOnlySpan<float> samples);
 
     /// <summary>
-    /// Gets or sets the maximum decibel value for the display.
-    /// </summary>
-    float MaxDb { get; set; }
-
-    /// <summary>
-    /// Gets or sets whether to show the peak level line.
-    /// </summary>
-    bool ShowPeak { get; set; }
-
-    /// <summary>
-    /// Pushes new level measurements into the history buffer.
-    /// </summary>
-    /// <param name="rms">The RMS level (0-1).</param>
-    /// <param name="peak">The peak level (0-1).</param>
-    void PushLevel(float rms, float peak);
-
-    /// <summary>
-    /// Renders the level history to the specified canvas.
+    /// Renders the current scope visualization to the provided canvas.
     /// </summary>
     /// <param name="canvas">The canvas to render to.</param>
-    /// <param name="width">The width of the render area.</param>
-    /// <param name="height">The height of the render area.</param>
-    void Render(SKCanvas canvas, int width, int height);
+    /// <param name="bounds">The bounds within which to render.</param>
+    void Render(SKCanvas canvas, SKRect bounds);
+
+    /// <summary>
+    /// Gets or sets the theme used for rendering.
+    /// </summary>
+    ScopeTheme Theme { get; set; }
+
+    /// <summary>
+    /// Gets or sets the sample rate of the audio data.
+    /// </summary>
+    int SampleRate { get; set; }
 }
