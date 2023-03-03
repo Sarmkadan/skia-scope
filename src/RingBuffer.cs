@@ -3,6 +3,10 @@ using System.Threading;
 
 namespace SkiaScope;
 
+/// <summary>
+/// A ring buffer that stores a sequence of floating-point numbers.
+/// </summary>
+/// <param name="capacity">The maximum number of elements the buffer can hold.</param>
 public class RingBuffer
 {
     private readonly float[] buffer;
@@ -12,14 +16,24 @@ public class RingBuffer
     private long totalWritten;
     private readonly object lockObj = new object();
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RingBuffer"/> class.
+    /// </summary>
+    /// <param name="capacity">The maximum number of elements the buffer can hold.</param>
     public RingBuffer(int capacity)
     {
         this.capacity = capacity;
         buffer = new float[capacity];
     }
 
+    /// <summary>
+    /// Gets the maximum number of elements the buffer can hold.
+    /// </summary>
     public int Capacity => capacity;
 
+    /// <summary>
+    /// Gets the number of elements currently stored in the buffer.
+    /// </summary>
     public int Count
     {
         get
@@ -31,6 +45,9 @@ public class RingBuffer
         }
     }
 
+    /// <summary>
+    /// Gets the total number of elements written to the buffer.
+    /// </summary>
     public long TotalWritten
     {
         get
@@ -42,6 +59,10 @@ public class RingBuffer
         }
     }
 
+    /// <summary>
+    /// Writes a sequence of floating-point numbers to the buffer.
+    /// </summary>
+    /// <param name="samples">The sequence of floating-point numbers to write.</param>
     public void Write(ReadOnlySpan<float> samples)
     {
         lock (lockObj)
@@ -60,6 +81,11 @@ public class RingBuffer
         }
     }
 
+    /// <summary>
+    /// Reads the latest sequence of floating-point numbers from the buffer.
+    /// </summary>
+    /// <param name="destination">The span to store the read sequence in.</param>
+    /// <returns>The number of elements read.</returns>
     public int ReadLatest(Span<float> destination)
     {
         lock (lockObj)
@@ -70,6 +96,9 @@ public class RingBuffer
         }
     }
 
+    /// <summary>
+    /// Clears the buffer, resetting it to its initial state.
+    /// </summary>
     public void Clear()
     {
         lock (lockObj)
