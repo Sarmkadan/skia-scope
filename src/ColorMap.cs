@@ -4,11 +4,18 @@ using SkiaSharp;
 
 namespace SkiaScope;
 
+/// <summary>
+/// A color map that maps a value to a color based on a set of color stops.
+/// </summary>
 public sealed class ColorMap
 {
     private readonly SKColor[] _stops;
     private readonly float[] _positions;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ColorMap"/> class.
+    /// </summary>
+    /// <param name="stops">The color stops to use in the color map.</param>
     public ColorMap(SKColor[] stops)
     {
         ArgumentNullException.ThrowIfNull(stops);
@@ -21,6 +28,11 @@ public sealed class ColorMap
             .ToArray();
     }
 
+    /// <summary>
+    /// Maps a value to a color based on the color stops in this color map.
+    /// </summary>
+    /// <param name="value">The value to map.</param>
+    /// <returns>The color that corresponds to the value.</returns>
     public SKColor Map(float value)
     {
         value = Math.Clamp(value, 0f, 1f);
@@ -40,7 +52,12 @@ public sealed class ColorMap
         return _stops[^1];
     }
 
-    public SKColor[] ToLut(int size = 256)
+    /// <summary>
+    /// Creates a lookup table (LUT) from this color map.
+    /// </summary>
+    /// <param name="size">The size of the LUT.</param>
+    /// <returns>The LUT.</returns>
+    public SKColor[] ToLut(int size)
     {
         if (size <= 0)
             throw new ArgumentOutOfRangeException(nameof(size), "Size must be positive");
@@ -55,6 +72,13 @@ public sealed class ColorMap
         return lut;
     }
 
+    /// <summary>
+    /// Linearly interpolates between two colors.
+    /// </summary>
+    /// <param name="a">The first color.</param>
+    /// <param name="b">The second color.</param>
+    /// <param name="t">The interpolation factor.</param>
+    /// <returns>The interpolated color.</returns>
     private static SKColor Lerp(SKColor a, SKColor b, float t)
     {
         t = Math.Clamp(t, 0f, 1f);
@@ -65,6 +89,10 @@ public sealed class ColorMap
         return new SKColor(r, g, bVal, aVal);
     }
 
+    /// <summary>
+    /// Creates a new <see cref="ColorMap"/> instance with the Viridis color map.
+    /// </summary>
+    /// <returns>A new <see cref="ColorMap"/> instance with the Viridis color map.</returns>
     public static ColorMap Viridis()
     {
         // Viridis color map with 16 stops
@@ -89,6 +117,10 @@ public sealed class ColorMap
         });
     }
 
+    /// <summary>
+    /// Creates a new <see cref="ColorMap"/> instance with the Magma color map.
+    /// </summary>
+    /// <returns>A new <see cref="ColorMap"/> instance with the Magma color map.</returns>
     public static ColorMap Magma()
     {
         // Magma color map with 16 stops
@@ -113,6 +145,10 @@ public sealed class ColorMap
         });
     }
 
+    /// <summary>
+    /// Creates a new <see cref="ColorMap"/> instance with the Inferno color map.
+    /// </summary>
+    /// <returns>A new <see cref="ColorMap"/> instance with the Inferno color map.</returns>
     public static ColorMap Inferno()
     {
         // Inferno color map with 16 stops
@@ -137,6 +173,10 @@ public sealed class ColorMap
         });
     }
 
+    /// <summary>
+    /// Creates a new <see cref="ColorMap"/> instance with the Grayscale color map.
+    /// </summary>
+    /// <returns>A new <see cref="ColorMap"/> instance with the Grayscale color map.</returns>
     public static ColorMap Grayscale()
     {
         // Grayscale color map with 16 stops from black to white
