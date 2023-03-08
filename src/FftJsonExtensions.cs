@@ -2,7 +2,9 @@ using System.Text.Json;
 
 public static class FftJsonExtensions
 {
-    // Cached JsonSerializerOptions with camelCase naming.
+    /// <summary>
+    /// Cached JsonSerializerOptions with camelCase naming.
+    /// </summary>
     private static readonly JsonSerializerOptions _options = new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -15,6 +17,9 @@ public static class FftJsonExtensions
     /// <param name="value">The Fft instance to serialize.</param>
     /// <param name="indented">If true, the output JSON will be indented.</param>
     /// <returns>A JSON string representing the Fft instance.</returns>
+    /// <remarks>
+    /// If indentation is requested, a new JsonSerializerOptions instance is created with the cached options and indentation enabled.
+    /// </remarks>
     public static string ToJson(this Fft value, bool indented = false)
     {
         // If indentation is requested, clone the cached options and enable indentation.
