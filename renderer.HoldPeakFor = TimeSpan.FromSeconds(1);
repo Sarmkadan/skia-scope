@@ -1,0 +1,7 @@
+
+## ColorMap
+
+A `ColorMap` is a mapping of color values to a specific color scheme. It can be used to create a color lookup table (LUT) for use in rendering.
+
+### Example usage
+
