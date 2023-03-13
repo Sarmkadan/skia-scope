@@ -1,14 +1,22 @@
+using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
+namespace SkiaScope;
+
+/// <summary>
+/// Provides JSON serialization and deserialization extension methods for <see cref="Fft"/> instances.
+/// </summary>
 public static class FftJsonExtensions
 {
     /// <summary>
-    /// Cached JsonSerializerOptions with camelCase naming.
+    /// Cached <see cref="JsonSerializerOptions"/> with camelCase naming and default settings.
     /// </summary>
-    private static readonly JsonSerializerOptions _options = new JsonSerializerOptions
+    private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
+        WriteIndented = false,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     /// <summary>
@@ -17,15 +25,14 @@ public static class FftJsonExtensions
     /// <param name="value">The Fft instance to serialize.</param>
     /// <param name="indented">If true, the output JSON will be indented.</param>
     /// <returns>A JSON string representing the Fft instance.</returns>
-    /// <remarks>
-    /// If indentation is requested, a new JsonSerializerOptions instance is created with the cached options and indentation enabled.
-    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
     public static string ToJson(this Fft value, bool indented = false)
     {
-        // If indentation is requested, clone the cached options and enable indentation.
+        ArgumentNullException.ThrowIfNull(value);
+
         var options = indented
-            ? new JsonSerializerOptions(_options) { WriteIndented = true }
-            : _options;
+            ? new JsonSerializerOptions(_jsonOptions) { WriteIndented = true }
+            : _jsonOptions;
 
         return JsonSerializer.Serialize(value, options);
     }
@@ -35,9 +42,12 @@ public static class FftJsonExtensions
     /// </summary>
     /// <param name="json">The JSON string.</param>
     /// <returns>The deserialized <see cref="Fft"/> instance, or null if the JSON is empty.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
     public static Fft? FromJson(string json)
     {
-        return JsonSerializer.Deserialize<Fft>(json, _options);
+        ArgumentNullException.ThrowIfNull(json);
+
+        return JsonSerializer.Deserialize<Fft>(json, _jsonOptions);
     }
 
     /// <summary>
@@ -46,11 +56,14 @@ public static class FftJsonExtensions
     /// <param name="json">The JSON string.</param>
     /// <param name="value">When this method returns, contains the deserialized <see cref="Fft"/> instance if the operation succeeded; otherwise, null.</param>
     /// <returns>True if deserialization succeeded; otherwise, false.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
     public static bool TryFromJson(string json, out Fft? value)
     {
+        ArgumentNullException.ThrowIfNull(json);
+
         try
         {
-            value = JsonSerializer.Deserialize<Fft>(json, _options);
+            value = JsonSerializer.Deserialize<Fft>(json, _jsonOptions);
             return true;
         }
         catch (JsonException)
