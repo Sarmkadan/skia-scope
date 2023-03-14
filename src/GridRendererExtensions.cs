@@ -14,11 +14,17 @@ public static class GridRendererExtensions
     /// <param name="canvas">The canvas to draw on.</param>
     /// <param name="bounds">The bounds within which to draw.</param>
     /// <param name="divisions">Number of divisions in both X and Y directions.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="divisions"/> is less than 1.</exception>
     public static void DrawLinearGrid(this GridRenderer renderer, SKCanvas canvas, SKRect bounds, int divisions)
     {
-        if (renderer is null)
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(canvas);
+
+        if (divisions < 1)
         {
-            throw new ArgumentNullException(nameof(renderer));
+            throw new ArgumentOutOfRangeException(nameof(divisions), divisions, "Must be at least 1");
         }
 
         renderer.DrawLinearGrid(canvas, bounds, divisions, divisions);
@@ -32,6 +38,9 @@ public static class GridRendererExtensions
     /// <param name="bounds">The bounds within which to draw.</param>
     /// <param name="xDivisions">Number of vertical divisions.</param>
     /// <param name="yDivisions">Number of horizontal divisions.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="xDivisions"/> or <paramref name="yDivisions"/> is less than 1.</exception>
     public static void DrawLinearGrid(
         this GridRenderer renderer,
         SKCanvas canvas,
@@ -39,9 +48,17 @@ public static class GridRendererExtensions
         int xDivisions,
         int yDivisions)
     {
-        if (renderer is null)
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(canvas);
+
+        if (xDivisions < 1)
         {
-            throw new ArgumentNullException(nameof(renderer));
+            throw new ArgumentOutOfRangeException(nameof(xDivisions), xDivisions, "Must be at least 1");
+        }
+
+        if (yDivisions < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(yDivisions), yDivisions, "Must be at least 1");
         }
 
         renderer.DrawLinearGrid(canvas, bounds, xDivisions, yDivisions);
@@ -56,6 +73,10 @@ public static class GridRendererExtensions
     /// <param name="minDb">Minimum dB value.</param>
     /// <param name="maxDb">Maximum dB value.</param>
     /// <param name="stepDb">Step size between grid lines in dB.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="stepDb"/> is not positive.</exception>
+    /// <exception cref="ArgumentException"><paramref name="minDb"/> is not less than <paramref name="maxDb"/>.</exception>
     public static void DrawDbGrid(
         this GridRenderer renderer,
         SKCanvas canvas,
@@ -64,9 +85,17 @@ public static class GridRendererExtensions
         float maxDb,
         float stepDb)
     {
-        if (renderer is null)
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(canvas);
+
+        if (minDb >= maxDb)
         {
-            throw new ArgumentNullException(nameof(renderer));
+            throw new ArgumentException("minDb must be less than maxDb", nameof(minDb));
+        }
+
+        if (stepDb <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(stepDb), stepDb, "Must be positive");
         }
 
         renderer.DrawDbGrid(canvas, bounds, minDb, maxDb, stepDb);
@@ -80,6 +109,10 @@ public static class GridRendererExtensions
     /// <param name="bounds">The bounds within which to draw.</param>
     /// <param name="minHz">Minimum frequency in Hz.</param>
     /// <param name="maxHz">Maximum frequency in Hz.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="minHz"/> or <paramref name="maxHz"/> is not positive.</exception>
+    /// <exception cref="ArgumentException"><paramref name="minHz"/> is not less than <paramref name="maxHz"/>.</exception>
     public static void DrawLogFrequencyGrid(
         this GridRenderer renderer,
         SKCanvas canvas,
@@ -87,9 +120,19 @@ public static class GridRendererExtensions
         float minHz,
         float maxHz)
     {
-        if (renderer is null)
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(canvas);
+
+        if (minHz <= 0 || maxHz <= 0)
         {
-            throw new ArgumentNullException(nameof(renderer));
+            throw new ArgumentOutOfRangeException(
+                nameof(minHz),
+                "Frequencies must be positive");
+        }
+
+        if (minHz >= maxHz)
+        {
+            throw new ArgumentException("minHz must be less than maxHz", nameof(minHz));
         }
 
         renderer.DrawLogFrequencyGrid(canvas, bounds, minHz, maxHz);
@@ -102,7 +145,11 @@ public static class GridRendererExtensions
     /// <param name="canvas">The canvas to draw on.</param>
     /// <param name="bounds">The bounds within which to draw.</param>
     /// <param name="divisions">Number of divisions.</param>
-    /// <param name="marginRatio">Margin ratio (0.0 to 1.0) to leave around the grid.</param>
+    /// <param name="marginRatio">Margin ratio (0.0 to 0.5) to leave around the grid.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="divisions"/> is less than 1.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="marginRatio"/> is not between 0 and 0.5.</exception>
     public static void DrawCenteredLinearGrid(
         this GridRenderer renderer,
         SKCanvas canvas,
@@ -110,24 +157,20 @@ public static class GridRendererExtensions
         int divisions,
         float marginRatio = 0.1f)
     {
-        if (renderer is null)
-        {
-            throw new ArgumentNullException(nameof(renderer));
-        }
-
-        if (canvas is null)
-        {
-            throw new ArgumentNullException(nameof(canvas));
-        }
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(canvas);
 
         if (divisions < 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(divisions), "Must be at least 1");
+            throw new ArgumentOutOfRangeException(nameof(divisions), divisions, "Must be at least 1");
         }
 
         if (marginRatio < 0 || marginRatio >= 0.5f)
         {
-            throw new ArgumentOutOfRangeException(nameof(marginRatio), "Must be between 0 and 0.5");
+            throw new ArgumentOutOfRangeException(
+                nameof(marginRatio),
+                marginRatio,
+                "Must be between 0 and 0.5");
         }
 
         // Calculate centered bounds with margins
@@ -136,6 +179,11 @@ public static class GridRendererExtensions
 
         float contentWidth = bounds.Width - (2 * marginX);
         float contentHeight = bounds.Height - (2 * marginY);
+
+        if (contentWidth <= 0 || contentHeight <= 0)
+        {
+            throw new ArgumentException("Bounds are too small for the specified margin ratio", nameof(bounds));
+        }
 
         SKRect contentBounds = new(
             bounds.Left + marginX,
@@ -157,6 +205,9 @@ public static class GridRendererExtensions
     /// <param name="yDivisions">Number of horizontal divisions.</param>
     /// <param name="xOffset">Horizontal offset from left edge.</param>
     /// <param name="yOffset">Vertical offset from top edge.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="xDivisions"/> or <paramref name="yDivisions"/> is less than 1.</exception>
     public static void DrawOffsetLinearGrid(
         this GridRenderer renderer,
         SKCanvas canvas,
@@ -166,14 +217,17 @@ public static class GridRendererExtensions
         float xOffset = 0,
         float yOffset = 0)
     {
-        if (renderer is null)
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(canvas);
+
+        if (xDivisions < 1)
         {
-            throw new ArgumentNullException(nameof(renderer));
+            throw new ArgumentOutOfRangeException(nameof(xDivisions), xDivisions, "Must be at least 1");
         }
 
-        if (canvas is null)
+        if (yDivisions < 1)
         {
-            throw new ArgumentNullException(nameof(canvas));
+            throw new ArgumentOutOfRangeException(nameof(yDivisions), yDivisions, "Must be at least 1");
         }
 
         // Create offset bounds
@@ -196,6 +250,10 @@ public static class GridRendererExtensions
     /// <param name="divisions">Number of divisions.</param>
     /// <param name="aspectRatioX">Horizontal aspect ratio component.</param>
     /// <param name="aspectRatioY">Vertical aspect ratio component.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="divisions"/> is less than 1.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="aspectRatioX"/> or <paramref name="aspectRatioY"/> is not positive.</exception>
     public static void DrawAspectRatioGrid(
         this GridRenderer renderer,
         SKCanvas canvas,
@@ -204,24 +262,19 @@ public static class GridRendererExtensions
         float aspectRatioX = 1,
         float aspectRatioY = 1)
     {
-        if (renderer is null)
-        {
-            throw new ArgumentNullException(nameof(renderer));
-        }
-
-        if (canvas is null)
-        {
-            throw new ArgumentNullException(nameof(canvas));
-        }
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(canvas);
 
         if (divisions < 1)
         {
-            throw new ArgumentOutOfRangeException(nameof(divisions), "Must be at least 1");
+            throw new ArgumentOutOfRangeException(nameof(divisions), divisions, "Must be at least 1");
         }
 
         if (aspectRatioX <= 0 || aspectRatioY <= 0)
         {
-            throw new ArgumentOutOfRangeException("Aspect ratio components must be positive");
+            throw new ArgumentOutOfRangeException(
+                nameof(aspectRatioX),
+                "Aspect ratio components must be positive");
         }
 
         // Calculate bounds that maintain aspect ratio
@@ -232,6 +285,11 @@ public static class GridRendererExtensions
         {
             targetWidth = bounds.Width;
             targetHeight = bounds.Height * (aspectRatioY / aspectRatioX);
+        }
+
+        if (targetWidth <= 0 || targetHeight <= 0)
+        {
+            throw new ArgumentException("Calculated bounds are invalid", nameof(bounds));
         }
 
         float xMargin = (bounds.Width - targetWidth) / 2;
