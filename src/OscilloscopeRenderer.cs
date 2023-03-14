@@ -10,8 +10,8 @@ namespace SkiaScope;
 public sealed class OscilloscopeRenderer : IScopeRenderer
 {
     private readonly ScopeTheme _theme;
-    private readonly RingBuffer _xBuffer;
-    private readonly RingBuffer _yBuffer;
+    internal readonly RingBuffer _xBuffer;
+    internal readonly RingBuffer _yBuffer;
     private int _pointCount = 2048;
     private float _lineWidth = 1.5f;
     private float _alphaFalloff = 0.99f;
