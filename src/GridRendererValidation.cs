@@ -17,23 +17,23 @@ public static class GridRendererValidation
     {
         var problems = new List<string>();
 
-        // Color components are bytes, so they're always in range 0-255
-        // But we can check for default/empty colors
-        if (value.R == 0 && value.G == 0 && value.B == 0 && value.A == 255)
-        {
-            problems.Add("Color appears to be default black (0, 0, 0)");
-        }
-
         // Check for fully transparent colors (unless intentional)
         if (value.A == 0)
         {
             problems.Add("Color is fully transparent (alpha = 0)");
         }
 
-        // Check for invalid alpha values (though bytes are always valid)
-        if (value.A > 255)
+        // Check for colors that are effectively invisible due to low alpha
+        if (value.A < 32)
         {
-            problems.Add("Color alpha must be in range 0-255");
+            problems.Add("Color has very low alpha (< 32) and may be invisible");
+        }
+
+        // Detect what appears to be an unset/default color
+        // A truly default color would have all components at their minimum values
+        if (value.R == 0 && value.G == 0 && value.B == 0)
+        {
+            problems.Add("Color appears to be default black (0, 0, 0)");
         }
 
         return problems.AsReadOnly();
@@ -42,12 +42,9 @@ public static class GridRendererValidation
     /// <summary>
     /// Determines whether a <see cref="Color"/> instance is valid.
     /// </summary>
-    /// <param name="value">The Color instance to check.</param>
+    /// <param name="value">The Color instance to validate.</param>
     /// <returns>True if valid; otherwise, false.</returns>
-    public static bool IsValid(this Color value)
-    {
-        return Validate(value).Count == 0;
-    }
+    public static bool IsValid(this Color value) => Validate(value).Count == 0;
 
     /// <summary>
     /// Ensures that a <see cref="Color"/> instance is valid, throwing an exception if not.
@@ -60,8 +57,7 @@ public static class GridRendererValidation
         if (problems.Count > 0)
         {
             throw new ArgumentException(
-                $"Color is invalid:{Environment.NewLine}- {
-                    string.Join($"{Environment.NewLine}- ", problems)}");
+                $"Color is invalid:{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", problems)}");
         }
     }
 
@@ -111,6 +107,12 @@ public static class GridRendererValidation
             problems.Add("TextColor is fully transparent (alpha = 0)");
         }
 
+        // Check for very low alpha values that might make text unreadable
+        if (value.TextColor.A < 128)
+        {
+            problems.Add("TextColor has low alpha (< 128) and may be difficult to read");
+        }
+
         return problems.AsReadOnly();
     }
 
@@ -119,15 +121,13 @@ public static class GridRendererValidation
     /// </summary>
     /// <param name="value">The ScopeTheme instance to check.</param>
     /// <returns>True if valid; otherwise, false.</returns>
-    public static bool IsValid(this ScopeTheme value)
-    {
-        return Validate(value).Count == 0;
-    }
+    public static bool IsValid(this ScopeTheme value) => Validate(value).Count == 0;
 
     /// <summary>
     /// Ensures that a <see cref="ScopeTheme"/> instance is valid, throwing an exception if not.
     /// </summary>
     /// <param name="value">The ScopeTheme instance to validate.</param>
+    /// <exception cref="ArgumentNullException">Thrown if the instance is null.</exception>
     /// <exception cref="ArgumentException">Thrown if the instance is invalid.</exception>
     public static void EnsureValid(this ScopeTheme value)
     {
@@ -140,8 +140,7 @@ public static class GridRendererValidation
         if (problems.Count > 0)
         {
             throw new ArgumentException(
-                $"ScopeTheme is invalid:{Environment.NewLine}- {
-                    string.Join($"{Environment.NewLine}- ", problems)}");
+                $"ScopeTheme is invalid:{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", problems)}");
         }
     }
 }
