@@ -14,11 +14,13 @@ public static class ColorMapExtensions
     /// </summary>
     /// <param name="colorMap">The color map to reverse.</param>
     /// <returns>A new color map with colors in reverse order.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="colorMap"/> is null.</exception>
     public static ColorMap Reverse(this ColorMap colorMap)
     {
         ArgumentNullException.ThrowIfNull(colorMap);
 
-        var reversedStops = colorMap.ToLut(colorMap.ToLut(256).Length).Reverse().ToArray();
+        var lut = colorMap.ToLut(256);
+        var reversedStops = lut.Reverse().ToArray();
         return new ColorMap(reversedStops);
     }
 
@@ -29,6 +31,7 @@ public static class ColorMapExtensions
     /// <param name="other">The color map to blend with.</param>
     /// <param name="factor">The blending factor (0.0 to 1.0).</param>
     /// <returns>A new blended color map.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="colorMap"/> or <paramref name="other"/> is null.</exception>
     public static ColorMap Blend(this ColorMap colorMap, ColorMap other, float factor)
     {
         ArgumentNullException.ThrowIfNull(colorMap);
@@ -38,8 +41,8 @@ public static class ColorMapExtensions
 
         var lut1 = colorMap.ToLut(256);
         var lut2 = other.ToLut(256);
-        var blendedStops = new SKColor[256];
 
+        var blendedStops = new SKColor[256];
         for (var i = 0; i < 256; i++)
         {
             var t = (float)i / 255f;
@@ -53,13 +56,17 @@ public static class ColorMapExtensions
     /// Creates a new color map with the specified number of color stops evenly distributed.
     /// </summary>
     /// <param name="colorMap">The color map to resample.</param>
-    /// <param name="stopCount">The number of color stops to create.</param>
+    /// <param name="stopCount">The number of color stops to create. Must be at least 2.</param>
     /// <returns>A new color map with the specified number of stops.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="colorMap"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="stopCount"/> is less than 2.</exception>
     public static ColorMap Resample(this ColorMap colorMap, int stopCount)
     {
         ArgumentNullException.ThrowIfNull(colorMap);
         if (stopCount < 2)
+        {
             throw new ArgumentException("At least two stops are required", nameof(stopCount));
+        }
 
         var lut = colorMap.ToLut(stopCount);
         return new ColorMap(lut);
@@ -71,6 +78,7 @@ public static class ColorMapExtensions
     /// <param name="colorMap">The color map to adjust.</param>
     /// <param name="alphaFactor">The alpha adjustment factor (0.0 to 1.0).</param>
     /// <returns>A new color map with adjusted alpha values.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="colorMap"/> is null.</exception>
     public static ColorMap WithAlpha(this ColorMap colorMap, float alphaFactor)
     {
         ArgumentNullException.ThrowIfNull(colorMap);
@@ -95,12 +103,10 @@ public static class ColorMapExtensions
     /// <param name="t">The interpolation factor.</param>
     /// <returns>The interpolated color.</returns>
     private static SKColor Lerp(SKColor a, SKColor b, float t)
-    {
-        t = Math.Clamp(t, 0f, 1f);
-        var r = (byte)(a.Red + (b.Red - a.Red) * t);
-        var g = (byte)(a.Green + (b.Green - a.Green) * t);
-        var bVal = (byte)(a.Blue + (b.Blue - a.Blue) * t);
-        var aVal = (byte)(a.Alpha + (b.Alpha - a.Alpha) * t);
-        return new SKColor(r, g, bVal, aVal);
-    }
+        => new SKColor(
+            (byte)(a.Red + (b.Red - a.Red) * t),
+            (byte)(a.Green + (b.Green - a.Green) * t),
+            (byte)(a.Blue + (b.Blue - a.Blue) * t),
+            (byte)(a.Alpha + (b.Alpha - a.Alpha) * t)
+        );
 }
