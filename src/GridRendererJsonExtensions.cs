@@ -40,8 +40,9 @@ public static class GridRendererJsonExtensions
     /// Deserializes a JSON string to a <see cref="GridRenderer"/> instance.
     /// </summary>
     /// <param name="json">The JSON string to deserialize.</param>
-    /// <returns>The deserialized <see cref="GridRenderer"/> instance, or <see langword="null"/> if the JSON is invalid.</returns>
+    /// <returns>The deserialized <see cref="GridRenderer"/> instance.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+    /// <exception cref="JsonException">The JSON is invalid.</exception>
     public static GridRenderer? FromJson(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
