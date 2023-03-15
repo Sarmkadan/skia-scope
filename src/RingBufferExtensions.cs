@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace SkiaScope;
 
@@ -12,8 +13,10 @@ public static class RingBufferExtensions
     /// </summary>
     /// <param name="buffer">The ring buffer instance.</param>
     /// <param name="value">The value to write.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
     public static void Write(this RingBuffer buffer, float value)
     {
+        ArgumentNullException.ThrowIfNull(buffer);
         buffer.Write(new ReadOnlySpan<float>(in value));
     }
 
@@ -22,8 +25,11 @@ public static class RingBufferExtensions
     /// </summary>
     /// <param name="buffer">The ring buffer instance.</param>
     /// <returns>An array containing all elements currently in the buffer.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
     public static float[] ReadAll(this RingBuffer buffer)
     {
+        ArgumentNullException.ThrowIfNull(buffer);
+
         if (buffer.Count == 0)
         {
             return Array.Empty<float>();
@@ -40,8 +46,11 @@ public static class RingBufferExtensions
     /// <param name="buffer">The ring buffer instance.</param>
     /// <param name="samples">The sequence of values to write.</param>
     /// <returns>True if all elements were written; false if buffer is full.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
     public static bool TryWrite(this RingBuffer buffer, ReadOnlySpan<float> samples)
     {
+        ArgumentNullException.ThrowIfNull(buffer);
+
         if (samples.Length == 0)
         {
             return true;
@@ -64,8 +73,10 @@ public static class RingBufferExtensions
     /// </summary>
     /// <param name="buffer">The ring buffer instance.</param>
     /// <returns>True if the buffer contains no elements; otherwise, false.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
     public static bool IsEmpty(this RingBuffer buffer)
     {
+        ArgumentNullException.ThrowIfNull(buffer);
         return buffer.Count == 0;
     }
 
@@ -74,8 +85,10 @@ public static class RingBufferExtensions
     /// </summary>
     /// <param name="buffer">The ring buffer instance.</param>
     /// <returns>True if the buffer is full; otherwise, false.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
     public static bool IsFull(this RingBuffer buffer)
     {
+        ArgumentNullException.ThrowIfNull(buffer);
         return buffer.Count == buffer.Capacity;
     }
 }
