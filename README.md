@@ -45,3 +45,24 @@ using (var paint = new SKPaint())
 }
 ```
 
+## GridRendererExtensions
+
+The `GridRendererExtensions` static class provides convenient extension methods for `GridRenderer`, simplifying complex tasks like centered layouts, offset grids, and aspect-ratio-aware drawing. It reduces boilerplate code for common grid configurations.
+
+### Example usage
+
+```csharp
+// Using GridRendererExtensions for specialized grid layouts
+var gridRenderer = new GridRenderer();
+var bounds = new SKRect(0, 0, 500, 300);
+
+// Draw a centered grid with a 10% margin
+gridRenderer.DrawCenteredLinearGrid(canvas, bounds, 10, 0.1f);
+
+// Draw a grid with custom x and y offsets
+gridRenderer.DrawOffsetLinearGrid(canvas, bounds, 8, 4, 10f, 20f);
+
+// Draw a grid maintaining a 16:9 aspect ratio
+gridRenderer.DrawAspectRatioGrid(canvas, bounds, 5, 16, 9);
+```
+
