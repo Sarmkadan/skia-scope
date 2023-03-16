@@ -88,9 +88,14 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
             return;
         }
 
-        // Split into left and right channels
-        ReadOnlySpan<float> leftChannel = samples.Slice(0, stereoSamples);
-        ReadOnlySpan<float> rightChannel = samples.Slice(1, stereoSamples);
+        // De-interleave the stereo pairs into separate left/right channels.
+        Span<float> leftChannel = stackalloc float[stereoSamples];
+        Span<float> rightChannel = stackalloc float[stereoSamples];
+        for (int i = 0; i < stereoSamples; i++)
+        {
+            leftChannel[i] = samples[i * 2];
+            rightChannel[i] = samples[i * 2 + 1];
+        }
 
         // Write to ring buffers
         _xBuffer.Write(leftChannel);
@@ -141,7 +146,10 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
             maxY = Math.Max(maxY, Math.Abs(yPoints[i]));
         }
 
-        float scale = Math.Min(bounds.Width * 0.45f, bounds.Height * 0.45f) / Math.Max(maxX, maxY);
+        float maxExtent = Math.Max(maxX, maxY);
+        float scale = maxExtent > 0
+            ? Math.Min(bounds.Width * 0.45f, bounds.Height * 0.45f) / maxExtent
+            : 0f;
 
         // Draw grid background (use grid color for background)
         using (var bgPaint = new SKPaint

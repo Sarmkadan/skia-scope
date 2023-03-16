@@ -1,13 +1,11 @@
 using System;
-using System.Threading;
 
 namespace SkiaScope;
 
 /// <summary>
 /// A ring buffer that stores a sequence of floating-point numbers.
 /// </summary>
-/// <param name="capacity">The maximum number of elements the buffer can hold.</param>
-public class RingBuffer
+public sealed class RingBuffer
 {
     private readonly float[] buffer;
     private readonly int capacity;
@@ -70,11 +68,11 @@ public class RingBuffer
             int samplesWritten = 0;
             while (samplesWritten < samples.Length)
             {
-                int remainingCapacity = capacity - count;
-                int writeCount = Math.Min(samples.Length - samplesWritten, remainingCapacity);
-                Array.Copy(samples.Slice(samplesWritten, writeCount).ToArray(), 0, buffer, writeIndex, writeCount);
+                int contiguousSpace = capacity - writeIndex;
+                int writeCount = Math.Min(samples.Length - samplesWritten, contiguousSpace);
+                samples.Slice(samplesWritten, writeCount).CopyTo(buffer.AsSpan(writeIndex, writeCount));
                 writeIndex = (writeIndex + writeCount) % capacity;
-                count += writeCount;
+                count = Math.Min(count + writeCount, capacity);
                 totalWritten += writeCount;
                 samplesWritten += writeCount;
             }
@@ -91,7 +89,16 @@ public class RingBuffer
         lock (lockObj)
         {
             int readCount = Math.Min(count, destination.Length);
-            Array.Copy(buffer, (writeIndex - readCount + capacity) % capacity, destination.Slice(0, readCount).ToArray(), 0, readCount);
+            int start = (writeIndex - readCount + capacity) % capacity;
+            int firstPart = Math.Min(readCount, capacity - start);
+            buffer.AsSpan(start, firstPart).CopyTo(destination);
+
+            int remaining = readCount - firstPart;
+            if (remaining > 0)
+            {
+                buffer.AsSpan(0, remaining).CopyTo(destination.Slice(firstPart));
+            }
+
             return readCount;
         }
     }
