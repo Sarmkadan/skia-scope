@@ -1,68 +1,25 @@
-# skia-scope
+// existing content ...
 
-Realtime signal visualization on SkiaSharp: waveform, spectrogram, VU meter.
+## RingBufferExtensions
 
-## VuMeterRenderer
-
-The `VuMeterRenderer` is a visualizer that displays a VU meter, indicating the peak level of an audio signal. It can be configured to display the meter horizontally or vertically, and to hold the peak level for a specified amount of time.
-
-### Example usage
-
-
-## GridRenderer
-
-The `GridRenderer` provides rendering capabilities for drawing various types of grids on a SkiaSharp canvas, including linear, decibel, and logarithmic frequency grids. It supports customizable grid colors, thicknesses, and text rendering properties.
-
+The `RingBufferExtensions` static class provides convenient extension methods for working with `RingBuffer`, enabling common operations like writing data, reading all available data, and checking buffer status. This simplifies the interaction with ring buffers in various scenarios.
 
 ### Example usage
 
 ```csharp
-// Create a grid renderer with custom colors and dimensions
-var gridRenderer = new GridRenderer
-{
-    GridColor = GridRenderer.FromRgb(40, 40, 40),
-    TextColor = GridRenderer.FromRgb(200, 200, 200),
-    GridThickness = 1.5f,
-    FontSize = 12f
-};
+var ringBuffer = new RingBuffer(10); // Create a ring buffer with a capacity of 10
 
-// Draw a linear grid on the canvas
-using (var paint = new SKPaint())
-{
-    gridRenderer.DrawLinearGrid(canvas, paint, 0, 0, canvas.Width, canvas.Height, 50);
-}
+// Write data to the ring buffer
+RingBufferExtensions.Write(ringBuffer, new float[] { 1f, 2f, 3f });
 
-// Draw a decibel scale grid
-using (var paint = new SKPaint())
-{
-    gridRenderer.DrawDbGrid(canvas, paint, -60, 0, canvas.Width, canvas.Height, 10);
-}
+// Check if the buffer is empty or full
+bool isEmpty = RingBufferExtensions.IsEmpty(ringBuffer);
+bool isFull = RingBufferExtensions.IsFull(ringBuffer);
 
-// Draw a logarithmic frequency grid
-using (var paint = new SKPaint())
-{
-    gridRenderer.DrawLogFrequencyGrid(canvas, paint, 20, 20000, canvas.Width, canvas.Height, 3);
-}
-```
+// Try to write more data (returns false if buffer is full)
+bool wrote = RingBufferExtensions.TryWrite(ringBuffer, new float[] { 4f, 5f });
 
-## GridRendererExtensions
-
-The `GridRendererExtensions` static class provides convenient extension methods for `GridRenderer`, simplifying complex tasks like centered layouts, offset grids, and aspect-ratio-aware drawing. It reduces boilerplate code for common grid configurations.
-
-### Example usage
-
-```csharp
-// Using GridRendererExtensions for specialized grid layouts
-var gridRenderer = new GridRenderer();
-var bounds = new SKRect(0, 0, 500, 300);
-
-// Draw a centered grid with a 10% margin
-gridRenderer.DrawCenteredLinearGrid(canvas, bounds, 10, 0.1f);
-
-// Draw a grid with custom x and y offsets
-gridRenderer.DrawOffsetLinearGrid(canvas, bounds, 8, 4, 10f, 20f);
-
-// Draw a grid maintaining a 16:9 aspect ratio
-gridRenderer.DrawAspectRatioGrid(canvas, bounds, 5, 16, 9);
+// Read all data from the ring buffer
+float[] data = RingBufferExtensions.ReadAll(ringBuffer);
 ```
 
