@@ -1,25 +1,25 @@
 // existing content ...
 
-## RingBufferExtensions
+## GridRendererValidation
 
-The `RingBufferExtensions` static class provides convenient extension methods for working with `RingBuffer`, enabling common operations like writing data, reading all available data, and checking buffer status. This simplifies the interaction with ring buffers in various scenarios.
+The `GridRendererValidation` static class provides methods for validating `Color` and `ScopeTheme` objects, ensuring they meet certain criteria. It allows checking for validity, retrieving validation errors, and throwing exceptions if the data is invalid.
 
 ### Example usage
 
 ```csharp
-var ringBuffer = new RingBuffer(10); // Create a ring buffer with a capacity of 10
+var color = new Color(1, 2, 3, 4);
+var theme = new ScopeTheme();
 
-// Write data to the ring buffer
-RingBufferExtensions.Write(ringBuffer, new float[] { 1f, 2f, 3f });
+// Check if color and theme are valid
+bool isColorValid = GridRendererValidation.IsValid(color);
+bool isThemeValid = GridRendererValidation.IsValid(theme);
 
-// Check if the buffer is empty or full
-bool isEmpty = RingBufferExtensions.IsEmpty(ringBuffer);
-bool isFull = RingBufferExtensions.IsFull(ringBuffer);
+// Retrieve validation errors
+var colorErrors = GridRendererValidation.Validate(color);
+var themeErrors = GridRendererValidation.Validate(theme);
 
-// Try to write more data (returns false if buffer is full)
-bool wrote = RingBufferExtensions.TryWrite(ringBuffer, new float[] { 4f, 5f });
-
-// Read all data from the ring buffer
-float[] data = RingBufferExtensions.ReadAll(ringBuffer);
+// Ensure color and theme are valid, throwing if not
+GridRendererValidation.EnsureValid(color);
+GridRendererValidation.EnsureValid(theme);
 ```
 
