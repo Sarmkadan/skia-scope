@@ -23,6 +23,8 @@ private float _peakDecayDbPerSecond = 30.0f;
     private float[] _channelPeakHold = Array.Empty<float>();
     private float[] _channelPeakHoldTimer = Array.Empty<float>();
     private float _decayCoefficient = 0.01f;
+private bool _useDecibelScale = false;
+private bool _showDbGridLabels = true;
 
     /// <summary>
     /// Gets or sets the minimum dB value for the meter.
@@ -69,6 +71,25 @@ public float PeakDecayDbPerSecond
         get => _horizontal;
         set => _horizontal = value;
     }
+
+/// <summary>
+/// Gets or sets whether to use decibel scale for level mapping.
+/// When true, level is mapped via 20*log10 and clamped at -60dB floor.
+/// </summary>
+public bool UseDecibelScale
+{
+	get => _useDecibelScale;
+	set => _useDecibelScale = value;
+}
+
+/// <summary>
+/// Gets or sets whether to show dB grid labels when UseDecibelScale is enabled.
+/// </summary>
+public bool ShowDbGridLabels
+{
+	get => _showDbGridLabels;
+	set => _showDbGridLabels = value;
+}
 
     /// <summary>
     /// Gets or sets the theme used for rendering.
@@ -243,6 +264,44 @@ public float PeakDecayDbPerSecond
             return;
         }
 
+        // Draw dB grid when UseDecibelScale is enabled
+        if (_useDecibelScale && _showDbGridLabels)
+        {
+            // Draw horizontal dB grid lines from -60dB to 0dB
+            float minDb = _minDb;
+            float maxDb = 0;
+            float stepDb = 10;
+
+            for (float db = minDb; db <= maxDb; db += stepDb)
+            {
+                float yPos = bounds.Bottom - ((db - minDb) / (maxDb - minDb) * bounds.Height);
+                yPos = Math.Clamp(yPos, bounds.Top, bounds.Bottom);
+
+                using var gridPaint = new SKPaint
+                {
+                    Color = _theme.GridColor.WithAlpha(100).ToSKColor(),
+                    StrokeWidth = _theme.GridThickness * 0.5f,
+                    IsAntialias = true,
+                    Style = SKPaintStyle.Stroke
+                };
+
+                canvas.DrawLine(bounds.Left, yPos, bounds.Right, yPos, gridPaint);
+
+                // Draw dB label
+                string label = $"{db:0}dB";
+                using var textPaint = new SKPaint
+                {
+                    Color = _theme.TextColor.ToSKColor(),
+                    TextSize = _theme.FontSize * 0.8f,
+                    IsAntialias = true,
+                    TextAlign = SKTextAlign.Right
+                };
+
+                float xPos = bounds.Left - 4;
+                canvas.DrawText(label, xPos, yPos + (_theme.FontSize * 0.8f / 3), textPaint);
+            }
+        }
+
         // Draw background
         using (var bgPaint = new SKPaint
         {
@@ -310,10 +369,10 @@ public float PeakDecayDbPerSecond
         peakDb = Math.Max(peakDb, _minDb);
         peakHoldDb = Math.Max(peakHoldDb, _minDb);
 
-        // Calculate normalized positions (0 to 1)
-        float rmsPos = (rmsDb - _minDb) / (0 - _minDb);
-        float peakPos = (peakDb - _minDb) / (0 - _minDb);
-        float peakHoldPos = (peakHoldDb - _minDb) / (0 - _minDb);
+        // Calculate normalized positions (0 to 1) using LevelToPosition for decibel scaling
+        float rmsPos = LevelToPosition(rms);
+        float peakPos = LevelToPosition(peak);
+        float peakHoldPos = LevelToPosition(peakHold);
 
         // Draw meter background (filled rectangle)
         using (var bgPaint = new SKPaint
@@ -389,20 +448,20 @@ public float PeakDecayDbPerSecond
                 barColor = _theme.GridColor.WithAlpha(80).ToSKColor();
             }
 
-            // Calculate bar position and size
+            // Calculate bar position and size using LevelToPosition for decibel scaling
             float barX, barY, barActualSize;
 
             if (_horizontal)
             {
                 barX = startX + i * (barWidth + barSpacing);
                 barY = startY + (bounds.Height - barHeightOrWidth) / 2;
-                barActualSize = barHeightOrWidth * barValue;
+                barActualSize = barHeightOrWidth * LevelToPosition(barValue);
             }
             else
             {
                 barX = startX + (bounds.Width - barWidth) / 2;
                 barY = startY - (i * (barHeightOrWidth + barSpacing));
-                barActualSize = barHeightOrWidth * barValue;
+                barActualSize = barHeightOrWidth * LevelToPosition(barValue);
             }
 
             // Draw the bar
@@ -453,6 +512,24 @@ public float PeakDecayDbPerSecond
             }
         }
     }
+
+private float LevelToPosition(float level)
+{
+	if (_useDecibelScale)
+	{
+		// Map level via 20*log10 and clamp at -60dB floor
+		float db = 20 * MathF.Log10(level);
+		db = MathF.Max(db, -60); // Clamp at -60dB floor
+		// Convert from dB to normalized position: -60dB = 0, 0dB = 1
+		return (db + 60) / 60;
+	}
+	else
+	{
+		// Original linear mapping
+		return level;
+	}
+}
+
 
     private static float LinearToDb(float linear)
     {
