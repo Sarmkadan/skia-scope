@@ -15,6 +15,8 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     private int _pointCount = 2048;
     private float _lineWidth = 1.5f;
     private float _alphaFalloff = 0.99f;
+    private float _persistenceAmount = 0.0f;
+    private SKBitmap? _previousFrame;
     private bool _enableEdgeAlignment = false;
     private float _edgeThreshold = 0.0f;
     private float _edgeHysteresis = 0.1f;
@@ -44,6 +46,16 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     {
         get => _alphaFalloff;
         set => _alphaFalloff = Math.Clamp(value, 0.9f, 0.999f);
+    }
+
+    /// <summary>
+    /// Gets or sets the persistence amount for drawing previous frames (0.0 to 1.0).
+    /// When set to 0, persistence is disabled. When set to 1, only the previous frame is visible.
+    /// </summary>
+    public float PersistenceAmount
+    {
+        get => _persistenceAmount;
+        set => _persistenceAmount = Math.Clamp(value, 0.0f, 1.0f);
     }
 
     /// <summary>
@@ -217,6 +229,19 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
             ? Math.Min(bounds.Width * 0.45f, bounds.Height * 0.45f) / maxExtent
             : 0f;
 
+        // Draw previous frame with persistence effect
+        if (_previousFrame != null && PersistenceAmount > 0 && _previousFrame.Width == (int)bounds.Width && _previousFrame.Height == (int)bounds.Height)
+        {
+            using (var persistencePaint = new SKPaint
+            {
+                Color = _theme.GridColor.WithAlpha((byte)(255 * PersistenceAmount)).ToSKColor(),
+                Style = SKPaintStyle.Fill
+            })
+            {
+                canvas.DrawBitmap(_previousFrame, bounds, persistencePaint);
+            }
+        }
+
         // Draw grid background (use grid color for background)
         using (var bgPaint = new SKPaint
         {
@@ -274,6 +299,92 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
                                centerY - (yPoints[startIndex + i - 1] * scale),
                                x, y, linePaint);
             }
+        }
+
+        // Save current frame for next render if persistence is enabled
+        if (PersistenceAmount > 0)
+        {
+            if (_previousFrame == null || _previousFrame.Width != (int)bounds.Width || _previousFrame.Height != (int)bounds.Height)
+            {
+                _previousFrame?.Dispose();
+                _previousFrame = new SKBitmap((int)bounds.Width, (int)bounds.Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+            }
+
+            // Create a bitmap to store the frame
+            using (var frameBitmap = new SKBitmap((int)bounds.Width, (int)bounds.Height, SKColorType.Rgba8888, SKAlphaType.Premul))
+            using (var frameCanvas = new SKCanvas(frameBitmap))
+            {
+                // Draw the current frame to the bitmap
+                frameCanvas.Clear(SKColors.Transparent);
+
+                // Draw grid background
+                using (var bgPaint = new SKPaint
+                {
+                    Color = _theme.GridColor.WithAlpha(255).ToSKColor(),
+                    Style = SKPaintStyle.Fill
+                })
+                {
+                    frameCanvas.DrawRect(bounds, bgPaint);
+                }
+
+                // Draw axes
+                using (var axisPaint = new SKPaint
+                {
+                    Color = _theme.GridColor.ToSKColor(),
+                    StrokeWidth = _theme.GridThickness,
+                    IsAntialias = true,
+                    Style = SKPaintStyle.Stroke
+                })
+                {
+                    frameCanvas.DrawLine(bounds.Left, centerY, bounds.Right, centerY, axisPaint);
+                    frameCanvas.DrawLine(centerX, bounds.Top, centerX, bounds.Bottom, axisPaint);
+                }
+
+                // Draw oscilloscope trace with fading
+                for (int i = 0; i < alignedCount; i++)
+                {
+                    float x = centerX + (xPoints[startIndex + i] * scale);
+                    float y = centerY - (yPoints[startIndex + i] * scale);
+
+                    float alpha = 1.0f;
+                    if (i < alignedCount - 1)
+                    {
+                        alpha = (float)Math.Pow(AlphaFalloff, alignedCount - i);
+                    }
+
+                    using var linePaint = new SKPaint
+                    {
+                        Color = _theme.GridColor.WithAlpha((byte)(255 * alpha)).ToSKColor(),
+                        StrokeWidth = LineWidth,
+                        IsAntialias = true,
+                        Style = SKPaintStyle.Stroke
+                    };
+
+                    if (i == 0)
+                    {
+                        frameCanvas.DrawPoint(x, y, linePaint);
+                    }
+                    else
+                    {
+                        frameCanvas.DrawLine(xPoints[startIndex + i - 1] * scale + centerX,
+                            centerY - (yPoints[startIndex + i - 1] * scale),
+                            x, y, linePaint);
+                    }
+                }
+
+                // Copy to previous frame
+                using (var prevCanvas = new SKCanvas(_previousFrame))
+                {
+                    prevCanvas.Clear(SKColors.Transparent);
+                    prevCanvas.DrawBitmap(frameBitmap, 0, 0);
+                }
+            }
+        }
+        else
+        {
+            // Dispose previous frame when persistence is disabled
+            _previousFrame?.Dispose();
+            _previousFrame = null;
         }
     }
 }
