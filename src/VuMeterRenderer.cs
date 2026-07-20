@@ -14,7 +14,8 @@ public sealed class VuMeterRenderer : IScopeRenderer
     private readonly int _sampleRate;
     private readonly int _channels;
     private float _minDb = -60;
-    private float _peakHoldSeconds = 2;
+    private TimeSpan _holdPeakFor = TimeSpan.FromSeconds(1);
+    private float _peakDecayRate = 0.01f;
     private bool _horizontal = false;
     private float[] _channelRms = Array.Empty<float>();
     private float[] _channelPeak = Array.Empty<float>();
@@ -32,12 +33,21 @@ public sealed class VuMeterRenderer : IScopeRenderer
     }
 
     /// <summary>
-    /// Gets or sets the peak hold time in seconds.
+    /// Gets or sets the peak hold time.
     /// </summary>
-    public float PeakHoldSeconds
+    public TimeSpan HoldPeakFor
     {
-        get => _peakHoldSeconds;
-        set => _peakHoldSeconds = Math.Max(value, 0.1f);
+        get => _holdPeakFor;
+        set => _holdPeakFor = value > TimeSpan.Zero ? value : TimeSpan.FromSeconds(0.1);
+    }
+
+    /// <summary>
+    /// Gets or sets the peak decay rate.
+    /// </summary>
+    public float PeakDecayRate
+    {
+        get => _peakDecayRate;
+        set => _peakDecayRate = Math.Clamp(value, 0, 1);
     }
 
     /// <summary>
@@ -138,9 +148,14 @@ public sealed class VuMeterRenderer : IScopeRenderer
             else
             {
                 _channelPeakHoldTimer[ch] += 1.0f / _sampleRate;
-                if (_channelPeakHoldTimer[ch] >= _peakHoldSeconds)
+                if (_channelPeakHoldTimer[ch] >= _holdPeakFor.TotalSeconds)
                 {
-                    _channelPeakHold[ch] = _channelPeak[ch];
+                    // Decay the peak hold
+                    _channelPeakHold[ch] -= _channelPeakHold[ch] * _peakDecayRate;
+                    if (_channelPeakHold[ch] < _channelPeak[ch])
+                    {
+                        _channelPeakHold[ch] = _channelPeak[ch];
+                    }
                 }
             }
         }
