@@ -16,6 +16,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
     private float _minDb = -60;
     private TimeSpan _holdPeakFor = TimeSpan.FromSeconds(1);
     private float _peakDecayRate = 0.01f;
+private float _peakDecayDbPerSecond = 30.0f;
     private bool _horizontal = false;
     private float[] _channelRms = Array.Empty<float>();
     private float[] _channelPeak = Array.Empty<float>();
@@ -49,6 +50,16 @@ public sealed class VuMeterRenderer : IScopeRenderer
         get => _peakDecayRate;
         set => _peakDecayRate = Math.Clamp(value, 0, 1);
     }
+
+/// <summary>
+/// Gets or sets the peak decay rate in dB per second.
+/// This controls how fast the peak hold marker decays after the peak has been held.
+/// </summary>
+public float PeakDecayDbPerSecond
+{
+    get => _peakDecayDbPerSecond;
+    set => _peakDecayDbPerSecond = Math.Clamp(value, 0.1f, 1000.0f);
+}
 
     /// <summary>
     /// Gets or sets whether the meter is horizontal (true) or vertical (false).
@@ -150,12 +161,13 @@ public sealed class VuMeterRenderer : IScopeRenderer
                 _channelPeakHoldTimer[ch] += 1.0f / _sampleRate;
                 if (_channelPeakHoldTimer[ch] >= _holdPeakFor.TotalSeconds)
                 {
-                    // Decay the peak hold
-                    _channelPeakHold[ch] -= _channelPeakHold[ch] * _peakDecayRate;
-                    if (_channelPeakHold[ch] < _channelPeak[ch])
-                    {
-                        _channelPeakHold[ch] = _channelPeak[ch];
-                    }
+                        // Decay the peak hold using dB/s rate
+                        float decayAmountDb = _peakDecayDbPerSecond * (1.0f / _sampleRate);
+                        float decayMultiplier = MathF.Pow(10.0f, -decayAmountDb / 20.0f);
+                        _channelPeakHold[ch] *= decayMultiplier;
+                        if (_channelPeakHold[ch] < _channelPeak[ch])
+                        {
+                            _channelPeakHold[ch] = _channelPeak[ch];
                 }
             }
         }
@@ -163,6 +175,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
         // Store RMS and peak values in ring buffers for visualization
         _rmsBuffer.Write(_channelRms);
         _peakBuffer.Write(_channelPeak);
+                        }
     }
 
     private static float CalculateRms(ReadOnlySpan<float> samples)
