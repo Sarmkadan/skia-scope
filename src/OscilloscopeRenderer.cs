@@ -15,6 +15,9 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     private int _pointCount = 2048;
     private float _lineWidth = 1.5f;
     private float _alphaFalloff = 0.99f;
+    private bool _enableEdgeAlignment = false;
+    private float _edgeThreshold = 0.0f;
+    private float _edgeHysteresis = 0.1f;
 
     /// <summary>
     /// Gets or sets the number of points to display.
@@ -41,6 +44,34 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     {
         get => _alphaFalloff;
         set => _alphaFalloff = Math.Clamp(value, 0.9f, 0.999f);
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to enable edge-triggered alignment.
+    /// When enabled, the waveform is aligned to the first rising edge crossing of the threshold.
+    /// </summary>
+    public bool EnableEdgeAlignment
+    {
+        get => _enableEdgeAlignment;
+        set => _enableEdgeAlignment = value;
+    }
+
+    /// <summary>
+    /// Gets or sets the threshold level for edge detection (normalized -1.0 to 1.0).
+    /// </summary>
+    public float EdgeThreshold
+    {
+        get => _edgeThreshold;
+        set => _edgeThreshold = Math.Clamp(value, -1.0f, 1.0f);
+    }
+
+    /// <summary>
+    /// Gets or sets the hysteresis band width for edge detection (normalized -1.0 to 1.0).
+    /// </summary>
+    public float EdgeHysteresis
+    {
+        get => _edgeHysteresis;
+        set => _edgeHysteresis = Math.Clamp(value, 0.0f, 0.5f);
     }
 
     /// <summary>
@@ -103,6 +134,31 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     }
 
     /// <summary>
+    /// Aligns the waveform to the first rising edge if edge alignment is enabled.
+    /// </summary>
+    /// <param name="xPoints">The X channel points.</param>
+    /// <param name="yPoints">The Y channel points.</param>
+    /// <returns>The number of samples to skip for alignment, or 0 if no alignment.</returns>
+    private int AlignToRisingEdge(Span<float> xPoints, Span<float> yPoints)
+    {
+        if (!_enableEdgeAlignment || xPoints.Length < 2)
+        {
+            return 0;
+        }
+
+        // Use X channel (left channel) for edge detection
+        int edgeIndex = EdgeTrigger.FindFirstRisingEdge(xPoints, _edgeThreshold, _edgeHysteresis);
+
+        if (edgeIndex > 0 && edgeIndex < xPoints.Length - 1)
+        {
+            // Return the index to start from (skip samples before the edge)
+            return edgeIndex;
+        }
+
+        return 0;
+    }
+
+    /// <summary>
     /// Renders the oscilloscope visualization to the provided canvas.
     /// </summary>
     /// <param name="canvas">The canvas to render to.</param>
@@ -133,6 +189,16 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
         _xBuffer.ReadLatest(xPoints);
         _yBuffer.ReadLatest(yPoints);
 
+        // Align to rising edge if enabled
+        int startIndex = AlignToRisingEdge(xPoints, yPoints);
+        int alignedCount = pointCount - startIndex;
+
+        if (alignedCount < 2)
+        {
+            // Not enough points after alignment
+            return;
+        }
+
         // Calculate center
         float centerX = bounds.MidX;
         float centerY = bounds.MidY;
@@ -140,10 +206,10 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
         // Calculate scale to fit the data
         float maxX = 0;
         float maxY = 0;
-        for (int i = 0; i < pointCount; i++)
+        for (int i = 0; i < alignedCount; i++)
         {
-            maxX = Math.Max(maxX, Math.Abs(xPoints[i]));
-            maxY = Math.Max(maxY, Math.Abs(yPoints[i]));
+            maxX = Math.Max(maxX, Math.Abs(xPoints[startIndex + i]));
+            maxY = Math.Max(maxY, Math.Abs(yPoints[startIndex + i]));
         }
 
         float maxExtent = Math.Max(maxX, maxY);
@@ -153,22 +219,22 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
 
         // Draw grid background (use grid color for background)
         using (var bgPaint = new SKPaint
-               {
-                   Color = _theme.GridColor.WithAlpha(255).ToSKColor(),
-                   Style = SKPaintStyle.Fill
-               })
+        {
+            Color = _theme.GridColor.WithAlpha(255).ToSKColor(),
+            Style = SKPaintStyle.Fill
+        })
         {
             canvas.DrawRect(bounds, bgPaint);
         }
 
         // Draw axes
         using (var axisPaint = new SKPaint
-               {
-                   Color = _theme.GridColor.ToSKColor(),
-                   StrokeWidth = _theme.GridThickness,
-                   IsAntialias = true,
-                   Style = SKPaintStyle.Stroke
-               })
+        {
+            Color = _theme.GridColor.ToSKColor(),
+            StrokeWidth = _theme.GridThickness,
+            IsAntialias = true,
+            Style = SKPaintStyle.Stroke
+        })
         {
             // X axis
             canvas.DrawLine(bounds.Left, centerY, bounds.Right, centerY, axisPaint);
@@ -177,16 +243,16 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
         }
 
         // Draw oscilloscope trace with fading
-        for (int i = 0; i < pointCount; i++)
+        for (int i = 0; i < alignedCount; i++)
         {
-            float x = centerX + (xPoints[i] * scale);
-            float y = centerY - (yPoints[i] * scale); // Flip Y axis
+            float x = centerX + (xPoints[startIndex + i] * scale);
+            float y = centerY - (yPoints[startIndex + i] * scale); // Flip Y axis
 
             float alpha = 1.0f;
-            if (i < pointCount - 1)
+            if (i < alignedCount - 1)
             {
                 // Calculate age-based alpha (older points are more transparent)
-                alpha = (float)Math.Pow(AlphaFalloff, pointCount - i);
+                alpha = (float)Math.Pow(AlphaFalloff, alignedCount - i);
             }
 
             // Set alpha based on point age
@@ -204,8 +270,9 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
             }
             else
             {
-                canvas.DrawLine(xPoints[i-1] * scale + centerX, centerY - (yPoints[i-1] * scale),
-                              x, y, linePaint);
+                canvas.DrawLine(xPoints[startIndex + i - 1] * scale + centerX,
+                               centerY - (yPoints[startIndex + i - 1] * scale),
+                               x, y, linePaint);
             }
         }
     }
