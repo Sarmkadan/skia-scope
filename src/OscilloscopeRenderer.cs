@@ -17,9 +17,11 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     private float _alphaFalloff = 0.99f;
     private float _persistenceAmount = 0.0f;
     private SKBitmap? _previousFrame;
+    private ITrigger? _triggerStrategy;
     private bool _enableEdgeAlignment = false;
     private float _edgeThreshold = 0.0f;
     private float _edgeHysteresis = 0.1f;
+    private int _edgeHoldoffSamples = 0;
 
     /// <summary>
     /// Gets or sets the number of points to display.
@@ -59,6 +61,15 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     }
 
     /// <summary>
+    /// Gets or sets the trigger strategy used for waveform alignment.
+    /// </summary>
+    public ITrigger? TriggerStrategy
+    {
+        get => _triggerStrategy;
+        set => _triggerStrategy = value;
+    }
+
+    /// <summary>
     /// Gets or sets a value indicating whether to enable edge-triggered alignment.
     /// When enabled, the waveform is aligned to the first rising edge crossing of the threshold.
     /// </summary>
@@ -87,6 +98,15 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     }
 
     /// <summary>
+    /// Gets or sets the minimum number of samples between edge triggers to prevent repeated triggers.
+    /// </summary>
+    public int EdgeHoldoffSamples
+    {
+        get => _edgeHoldoffSamples;
+        set => _edgeHoldoffSamples = Math.Max(0, value);
+    }
+
+    /// <summary>
     /// Gets or sets the theme used for rendering.
     /// </summary>
     /// <exception cref="ArgumentNullException">Thrown if value is null.</exception>
@@ -102,11 +122,6 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     }
 
     /// <summary>
-    /// Gets or sets the minimum number of samples between edge triggers to prevent repeated triggers.
-    /// </summary>
-    public int EdgeHoldoffSamples { get; set; }
-
-    /// <summary>
     /// Gets or sets the sample rate of the audio data.
     /// </summary>
     public int SampleRate { get; set; }
@@ -115,6 +130,7 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     /// Initializes a new instance of the <see cref="OscilloscopeRenderer"/> class.
     /// </summary>
     /// <param name="theme">The theme containing colors and styles for rendering.</param>
+    /// <exception cref="ArgumentNullException">Thrown if theme is null.</exception>
     public OscilloscopeRenderer(ScopeTheme theme)
     {
         _theme = theme ?? throw new ArgumentNullException(nameof(theme));
@@ -125,7 +141,7 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     /// <summary>
     /// Pushes audio samples to the renderer.
     /// For oscilloscope, samples are interpreted as interleaved stereo pairs.
-    /// Left channel is used for X, right channel is used for Y.
+    /// Left channel is used for X, right channel is for Y.
     /// </summary>
     /// <param name="samples">Audio samples to be rendered (interleaved stereo).</param>
     public void PushSamples(ReadOnlySpan<float> samples)
@@ -157,25 +173,25 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     }
 
     /// <summary>
-    /// Aligns the waveform to the first rising edge if edge alignment is enabled.
+    /// Aligns the waveform to the trigger condition if enabled.
     /// </summary>
     /// <param name="xPoints">The X channel points.</param>
     /// <param name="yPoints">The Y channel points.</param>
     /// <returns>The number of samples to skip for alignment, or 0 if no alignment.</returns>
-    private int AlignToRisingEdge(Span<float> xPoints, Span<float> yPoints)
+    private int AlignToTrigger(Span<float> xPoints, Span<float> yPoints)
     {
-        if (!_enableEdgeAlignment || xPoints.Length < 2)
+        if (xPoints.Length < 2 || _triggerStrategy == null)
         {
             return 0;
         }
 
-        // Use X channel (left channel) for edge detection
-        int edgeIndex = EdgeTrigger.FindFirstRisingEdge(xPoints, _edgeThreshold, _edgeHysteresis, EdgeHoldoffSamples);
+        // Use X channel (left channel) for trigger detection
+        int? triggerIndex = _triggerStrategy.FindTriggerIndex(xPoints);
 
-        if (edgeIndex > 0 && edgeIndex < xPoints.Length - 1)
+        if (triggerIndex.HasValue && triggerIndex.Value > 0 && triggerIndex.Value < xPoints.Length - 1)
         {
-            // Return the index to start from (skip samples before the edge)
-            return edgeIndex;
+            // Return the index to start from (skip samples before the trigger)
+            return triggerIndex.Value;
         }
 
         return 0;
@@ -186,6 +202,7 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     /// </summary>
     /// <param name="canvas">The canvas to render to.</param>
     /// <param name="bounds">The bounds within which to render.</param>
+    /// <exception cref="ArgumentNullException">Thrown if canvas is null.</exception>
     public void Render(SKCanvas canvas, SKRect bounds)
     {
         if (canvas is null)
@@ -212,8 +229,8 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
         _xBuffer.ReadLatest(xPoints);
         _yBuffer.ReadLatest(yPoints);
 
-        // Align to rising edge if enabled
-        int startIndex = AlignToRisingEdge(xPoints, yPoints);
+        // Align to trigger if enabled
+        int startIndex = AlignToTrigger(xPoints, yPoints);
         int alignedCount = pointCount - startIndex;
 
         if (alignedCount < 2)
@@ -307,8 +324,8 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
             else
             {
                 canvas.DrawLine(xPoints[startIndex + i - 1] * scale + centerX,
-                               centerY - (yPoints[startIndex + i - 1] * scale),
-                               x, y, linePaint);
+                centerY - (yPoints[startIndex + i - 1] * scale),
+                x, y, linePaint);
             }
         }
 
@@ -378,8 +395,8 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
                     else
                     {
                         frameCanvas.DrawLine(xPoints[startIndex + i - 1] * scale + centerX,
-                            centerY - (yPoints[startIndex + i - 1] * scale),
-                            x, y, linePaint);
+                        centerY - (yPoints[startIndex + i - 1] * scale),
+                        x, y, linePaint);
                     }
                 }
 

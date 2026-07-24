@@ -6,40 +6,74 @@ namespace SkiaScope;
 /// Detects rising-edge crossings in a signal with hysteresis and holdoff.
 /// Returns the index of the first rising edge that crosses the threshold.
 /// </summary>
-public static class EdgeTrigger
+public sealed class EdgeTrigger : ITrigger
 {
+    private readonly float _threshold;
+    private readonly float _hysteresis;
+    private readonly int _holdoffSamples;
+    private int _lastTriggerIndex = -1;
+
     /// <summary>
-    /// Finds the first rising-edge crossing in a signal with hysteresis and optional holdoff.
+    /// Gets the threshold level for edge detection (normalized -1.0 to 1.0).
     /// </summary>
-    /// <param name="signal">The input signal to analyze.</param>
+    public float Threshold => _threshold;
+
+    /// <summary>
+    /// Gets the hysteresis band width for edge detection (normalized -1.0 to 1.0).
+    /// </summary>
+    public float Hysteresis => _hysteresis;
+
+    /// <summary>
+    /// Gets the minimum number of samples between triggers to prevent repeated triggers.
+    /// </summary>
+    public int HoldoffSamples => _holdoffSamples;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="EdgeTrigger"/> class.
+    /// </summary>
     /// <param name="threshold">The threshold level to cross (rising edge).</param>
     /// <param name="hysteresis">Hysteresis band width to prevent noise triggering. Default is 10% of threshold.</param>
     /// <param name="holdoffSamples">Minimum number of samples between triggers to prevent repeated triggers. Default is 0 (no holdoff).</param>
-    /// <returns>The index of the first rising edge crossing, or -1 if no edge found.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if signal is null.</exception>
-    public static int FindFirstRisingEdge(ReadOnlySpan<float> signal, float threshold, float hysteresis = 0.1f, int holdoffSamples = 0)
+    /// <exception cref="ArgumentException">Thrown if threshold is NaN or holdoffSamples is negative.</exception>
+    public EdgeTrigger(float threshold, float hysteresis = 0.1f, int holdoffSamples = 0)
     {
-        if (signal.Length < 2)
+        if (float.IsNaN(threshold))
         {
-            throw new ArgumentException("Signal must have at least 2 samples", nameof(signal));
+            throw new ArgumentException("Threshold cannot be NaN", nameof(threshold));
         }
+
         if (holdoffSamples < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(holdoffSamples), "Holdoff samples cannot be negative");
         }
 
         // Clamp hysteresis to reasonable values
-        hysteresis = Math.Clamp(hysteresis, 0.0f, Math.Abs(threshold) * 0.5f);
+        _threshold = threshold;
+        _hysteresis = Math.Clamp(Math.Abs(hysteresis), 0.0f, Math.Abs(threshold) * 0.5f);
+        _holdoffSamples = holdoffSamples;
+    }
+
+    /// <summary>
+    /// Finds the first rising-edge crossing in a signal with hysteresis and optional holdoff.
+    /// </summary>
+    /// <param name="signal">The input signal to analyze.</param>
+    /// <returns>The index of the first rising edge crossing, or -1 if no edge found.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if signal is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if signal length is less than 2.</exception>
+    public int? FindTriggerIndex(ReadOnlySpan<float> signal)
+    {
+        if (signal.Length < 2)
+        {
+            throw new ArgumentException("Signal must have at least 2 samples", nameof(signal));
+        }
 
         // Define the rising edge detection bands
         // We trigger when signal goes from below (threshold - hysteresis) to above (threshold + hysteresis)
-        float lowerThreshold = threshold - hysteresis;
-        float upperThreshold = threshold + hysteresis;
+        float lowerThreshold = _threshold - _hysteresis;
+        float upperThreshold = _threshold + _hysteresis;
 
         // Track whether we're currently in the "below hysteresis band" region
-        // This is more accurate than tracking "below threshold" for hysteresis
         bool wasInLowerBand = signal[0] < lowerThreshold;
-        int lastTriggerIndex = -1;
 
         for (int i = 0; i < signal.Length - 1; i++)
         {
@@ -50,30 +84,29 @@ public static class EdgeTrigger
             bool isRisingEdge = wasInLowerBand && current <= lowerThreshold && next >= upperThreshold;
 
             // Check holdoff: ensure we're far enough from the last trigger
-            bool isAfterHoldoff = lastTriggerIndex < 0 || i >= lastTriggerIndex + holdoffSamples;
+            bool isAfterHoldoff = _lastTriggerIndex < 0 || i >= _lastTriggerIndex + _holdoffSamples;
 
             if (isRisingEdge && isAfterHoldoff)
             {
-                lastTriggerIndex = i;
+                _lastTriggerIndex = i;
                 return i;
             }
 
             // Update state for next iteration
-            // Track whether we're in the lower hysteresis band (below threshold - hysteresis)
             wasInLowerBand = current < lowerThreshold;
         }
 
-        return -1; // No rising edge found
+        return null; // No rising edge found
     }
 
     /// <summary>
-    /// Finds the first rising-edge crossing with default hysteresis (10% of threshold).
+    /// Creates an EdgeTrigger with default hysteresis (10% of threshold).
     /// </summary>
-    /// <param name="signal">The input signal to analyze.</param>
     /// <param name="threshold">The threshold level to cross (rising edge).</param>
-    /// <returns>The index of the first rising edge crossing, or -1 if no edge found.</returns>
-    public static int FindFirstRisingEdge(ReadOnlySpan<float> signal, float threshold)
+    /// <returns>A new EdgeTrigger instance.</returns>
+    /// <exception cref="ArgumentException">Thrown if threshold is NaN.</exception>
+    public static EdgeTrigger CreateWithDefaultHysteresis(float threshold)
     {
-        return FindFirstRisingEdge(signal, threshold, Math.Abs(threshold) * 0.1f);
+        return new EdgeTrigger(threshold, Math.Abs(threshold) * 0.1f);
     }
 }
