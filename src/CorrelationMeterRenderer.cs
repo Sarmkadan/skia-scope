@@ -17,6 +17,7 @@ public sealed class CorrelationMeterRenderer : IScopeRenderer
     private float _correlation = 0;
     private float _peakPositive = 0;
     private float _peakNegative = 0;
+    private readonly GridRenderer _gridRenderer;
 
     /// <summary>
     /// Gets or sets the theme used for rendering.
@@ -78,6 +79,8 @@ public sealed class CorrelationMeterRenderer : IScopeRenderer
         _theme.EnsureValid();
         _leftBuffer = new RingBuffer(WindowSize);
         _rightBuffer = new RingBuffer(WindowSize);
+        _gridRenderer = new GridRenderer(_theme);
+        _gridRenderer.ShowLabels = false;
     }
 
     /// <summary>
@@ -206,9 +209,7 @@ public sealed class CorrelationMeterRenderer : IScopeRenderer
         }
 
         // Draw grid
-        var gridRenderer = new GridRenderer(_theme);
-        gridRenderer.ShowLabels = false;
-        gridRenderer.DrawLinearGrid(canvas, bounds, 10, 5);
+        _gridRenderer.DrawLinearGrid(canvas, bounds, 10, 5);
 
         // Calculate meter dimensions
         float meterHeight = bounds.Height * 0.6f;

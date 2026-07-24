@@ -1,14 +1,17 @@
+using System;
 using SkiaSharp;
 
 namespace SkiaScope;
 
 /// <summary>
-/// Helper for drawing various grid types in scope visualizations.
+/// Renders grid overlays for scope visualizations. Implements IScopeRenderer to allow
+/// uniform treatment in composite pipelines alongside other scope renderers.
 /// </summary>
-public sealed class GridRenderer
+public sealed class GridRenderer : IScopeRenderer
 {
     private readonly ScopeTheme _theme;
     private bool _showLabels = true;
+    private int _sampleRate;
 
     /// <summary>
     /// Gets or sets whether to show grid labels.
@@ -17,6 +20,30 @@ public sealed class GridRenderer
     {
         get => _showLabels;
         set => _showLabels = value;
+    }
+
+    /// <summary>
+    /// Gets or sets the theme used for rendering.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if value is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if value is invalid.</exception>
+    public ScopeTheme Theme
+    {
+        get => _theme;
+        set
+        {
+            value?.EnsureValid();
+            _ = value; // Theme is set in constructor and immutable
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the sample rate of the audio data.
+    /// </summary>
+    public int SampleRate
+    {
+        get => _sampleRate;
+        set => _sampleRate = Math.Max(1, value);
     }
 
     /// <summary>
@@ -29,6 +56,41 @@ public sealed class GridRenderer
     {
         _theme = theme ?? throw new ArgumentNullException(nameof(theme));
         _theme.EnsureValid();
+        _sampleRate = 44100; // Default sample rate
+    }
+
+    /// <summary>
+    /// Pushes audio samples to the renderer.
+    /// This renderer doesn't process audio samples directly, but implements the interface for compatibility.
+    /// </summary>
+    /// <param name="samples">Audio samples to be rendered.</param>
+    public void PushSamples(ReadOnlySpan<float> samples)
+    {
+        // Grid renderer doesn't need audio samples, but we implement the interface
+        _ = samples;
+    }
+
+    /// <summary>
+    /// Renders the grid visualization to the provided canvas.
+    /// </summary>
+    /// <param name="canvas">The canvas to render to.</param>
+    /// <param name="bounds">The bounds within which to render.</param>
+    /// <exception cref="ArgumentNullException">Thrown if canvas is null.</exception>
+    public void Render(SKCanvas canvas, SKRect bounds)
+    {
+        if (canvas is null)
+        {
+            throw new ArgumentNullException(nameof(canvas));
+        }
+
+        if (bounds.Width < 1 || bounds.Height < 1)
+        {
+            return; // Nothing to render
+        }
+
+        // Draw a simple linear grid by default
+        // Applications can call specific grid methods directly if they need more control
+        DrawLinearGrid(canvas, bounds, 10, 5);
     }
 
     /// <summary>
@@ -313,6 +375,23 @@ public sealed class ScopeTheme
     /// Gets the font size for labels.
     /// </summary>
     public float FontSize { get; init; } = 12.0f;
+
+    /// <summary>
+    /// Ensures the theme values are valid.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown if theme is invalid.</exception>
+    public void EnsureValid()
+    {
+        if (GridThickness <= 0)
+        {
+            throw new ArgumentException("GridThickness must be positive", nameof(GridThickness));
+        }
+
+        if (FontSize <= 0)
+        {
+            throw new ArgumentException("FontSize must be positive", nameof(FontSize));
+        }
+    }
 }
 
 /// <summary>
