@@ -43,8 +43,16 @@ public sealed class Fft
     /// An array of length <c>Size / 2 + 1</c> containing the magnitude of each
     /// non-negative frequency bin (bin 0 is DC, the last bin is Nyquist).
     /// </returns>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="samples"/> is empty (length 0).
+    /// </exception>
     public float[] ComputeMagnitudeSpectrum(ReadOnlySpan<float> samples)
     {
+        if (samples.Length == 0)
+        {
+            throw new ArgumentException("Input samples cannot be empty", nameof(samples));
+        }
+
         var real = new float[Size];
         var imaginary = new float[Size];
 

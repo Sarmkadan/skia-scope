@@ -16,6 +16,9 @@ public static class FftTests
         TestMultipleFrequencyComponents();
         TestHannWindowApplied();
         TestPowerOfTwoSizeRequirement();
+        TestZeroLengthInputThrows();
+        TestSingleSampleInput();
+        TestNonPowerOfTwoLengthInput();
 
         Console.WriteLine("All FftTests passed successfully.");
     }
@@ -302,5 +305,80 @@ public static class FftTests
         }
 
         Console.WriteLine(" ✓ Power of two size requirement");
+    }
+
+    private static void TestZeroLengthInputThrows()
+    {
+        Console.WriteLine(" Testing zero-length input throws...");
+
+        var fft = new Fft(1024);
+        var emptySamples = new float[0];
+
+        try
+        {
+            var magnitudes = fft.ComputeMagnitudeSpectrum(emptySamples);
+            throw new Exception("Expected ArgumentException for zero-length input, but none was thrown");
+        }
+        catch (ArgumentException ex) when (ex.Message.Contains("empty"))
+        {
+            // Expected - this is correct behavior
+        }
+
+        Console.WriteLine(" ✓ Zero-length input throws");
+    }
+
+    private static void TestSingleSampleInput()
+    {
+        Console.WriteLine(" Testing single sample input...");
+
+        var fft = new Fft(1024);
+        var singleSample = new float[1] { 1.0f };
+
+        var magnitudes = fft.ComputeMagnitudeSpectrum(singleSample);
+
+        // Should produce valid output with Size/2 + 1 bins
+        if (magnitudes.Length != fft.Size / 2 + 1)
+        {
+            throw new Exception($"Expected {fft.Size / 2 + 1} magnitude bins, got {magnitudes.Length}");
+        }
+
+        // DC component should be non-zero (the single sample after windowing)
+        if (magnitudes[0] <= 0.0f)
+        {
+            throw new Exception("Expected non-zero DC component for single sample");
+        }
+
+        Console.WriteLine(" ✓ Single sample input");
+    }
+
+    private static void TestNonPowerOfTwoLengthInput()
+    {
+        Console.WriteLine(" Testing non-power-of-two length input (1000 samples)...");
+
+        var fft = new Fft(1024);
+        var samples = new float[1000];
+
+        // Fill with a sine wave
+        for (int i = 0; i < 1000; i++)
+        {
+            samples[i] = MathF.Sin(2.0f * MathF.PI * 10.0f * i / 1000.0f);
+        }
+
+        var magnitudes = fft.ComputeMagnitudeSpectrum(samples);
+
+        // Should produce valid output with Size/2 + 1 bins
+        if (magnitudes.Length != fft.Size / 2 + 1)
+        {
+            throw new Exception($"Expected {fft.Size / 2 + 1} magnitude bins, got {magnitudes.Length}");
+        }
+
+        // Should have significant energy at the expected frequency (bin 10)
+        // Allow some tolerance for windowing effects and zero-padding
+        if (magnitudes[10] < 0.1f)
+        {
+            throw new Exception($"Expected significant energy at bin 10, got {magnitudes[10]}");
+        }
+
+        Console.WriteLine(" ✓ Non-power-of-two length input (1000 samples)");
     }
 }
