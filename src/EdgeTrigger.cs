@@ -3,23 +3,29 @@ using System;
 namespace SkiaScope;
 
 /// <summary>
-/// Detects rising-edge crossings in a signal with hysteresis.
+/// Detects rising-edge crossings in a signal with hysteresis and holdoff.
 /// Returns the index of the first rising edge that crosses the threshold.
 /// </summary>
 public static class EdgeTrigger
 {
     /// <summary>
-    /// Finds the first rising-edge crossing in a signal with hysteresis.
+    /// Finds the first rising-edge crossing in a signal with hysteresis and optional holdoff.
     /// </summary>
     /// <param name="signal">The input signal to analyze.</param>
     /// <param name="threshold">The threshold level to cross (rising edge).</param>
-    /// <param name="hysteresis">Hysteresis band width to prevent noise triggering.</param>
+    /// <param name="hysteresis">Hysteresis band width to prevent noise triggering. Default is 10% of threshold.</param>
+    /// <param name="holdoffSamples">Minimum number of samples between triggers to prevent repeated triggers. Default is 0 (no holdoff).</param>
     /// <returns>The index of the first rising edge crossing, or -1 if no edge found.</returns>
-    public static int FindFirstRisingEdge(ReadOnlySpan<float> signal, float threshold, float hysteresis = 0.1f)
+    /// <exception cref="ArgumentNullException">Thrown if signal is null.</exception>
+    public static int FindFirstRisingEdge(ReadOnlySpan<float> signal, float threshold, float hysteresis = 0.1f, int holdoffSamples = 0)
     {
         if (signal.Length < 2)
         {
-            return -1;
+            throw new ArgumentException("Signal must have at least 2 samples", nameof(signal));
+        }
+        if (holdoffSamples < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(holdoffSamples), "Holdoff samples cannot be negative");
         }
 
         // Clamp hysteresis to reasonable values
@@ -30,7 +36,10 @@ public static class EdgeTrigger
         float lowerThreshold = threshold - hysteresis;
         float upperThreshold = threshold + hysteresis;
 
-        bool wasBelow = true;
+        // Track whether we're currently in the "below hysteresis band" region
+        // This is more accurate than tracking "below threshold" for hysteresis
+        bool wasInLowerBand = signal[0] < lowerThreshold;
+        int lastTriggerIndex = -1;
 
         for (int i = 0; i < signal.Length - 1; i++)
         {
@@ -38,15 +47,20 @@ public static class EdgeTrigger
             float next = signal[i + 1];
 
             // Check if we're crossing from below lower threshold to above upper threshold
-            bool isRisingEdge = wasBelow && current <= lowerThreshold && next >= upperThreshold;
+            bool isRisingEdge = wasInLowerBand && current <= lowerThreshold && next >= upperThreshold;
 
-            if (isRisingEdge)
+            // Check holdoff: ensure we're far enough from the last trigger
+            bool isAfterHoldoff = lastTriggerIndex < 0 || i >= lastTriggerIndex + holdoffSamples;
+
+            if (isRisingEdge && isAfterHoldoff)
             {
+                lastTriggerIndex = i;
                 return i;
             }
 
             // Update state for next iteration
-            wasBelow = current < threshold;
+            // Track whether we're in the lower hysteresis band (below threshold - hysteresis)
+            wasInLowerBand = current < lowerThreshold;
         }
 
         return -1; // No rising edge found

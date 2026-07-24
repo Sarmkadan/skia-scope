@@ -102,6 +102,11 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     }
 
     /// <summary>
+    /// Gets or sets the minimum number of samples between edge triggers to prevent repeated triggers.
+    /// </summary>
+    public int EdgeHoldoffSamples { get; set; }
+
+    /// <summary>
     /// Gets or sets the sample rate of the audio data.
     /// </summary>
     public int SampleRate { get; set; }
@@ -165,7 +170,7 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
         }
 
         // Use X channel (left channel) for edge detection
-        int edgeIndex = EdgeTrigger.FindFirstRisingEdge(xPoints, _edgeThreshold, _edgeHysteresis);
+        int edgeIndex = EdgeTrigger.FindFirstRisingEdge(xPoints, _edgeThreshold, _edgeHysteresis, EdgeHoldoffSamples);
 
         if (edgeIndex > 0 && edgeIndex < xPoints.Length - 1)
         {
