@@ -320,6 +320,9 @@ public sealed class ScopeTheme
 /// </summary>
 public readonly struct Color
 {
+    private const byte MinChannelValue = 0;
+    private const byte MaxChannelValue = 255;
+
     /// <summary>
     /// Gets the red component.
     /// </summary>
@@ -343,31 +346,67 @@ public readonly struct Color
     /// <summary>
     /// Initializes a new instance of the <see cref="Color"/> struct.
     /// </summary>
+    /// <param name="r">The red component (0-255).</param>
+    /// <param name="g">The green component (0-255).</param>
+    /// <param name="b">The blue component (0-255).</param>
+    /// <param name="a">The alpha/transparency component (0-255).</param>
     public Color(byte r, byte g, byte b, byte a = 255)
     {
-        R = r;
-        G = g;
-        B = b;
-        A = a;
+        R = ClampChannel(r);
+        G = ClampChannel(g);
+        B = ClampChannel(b);
+        A = ClampChannel(a);
     }
 
     /// <summary>
     /// Creates a color from RGB values.
     /// </summary>
+    /// <param name="r">The red component (0-255).</param>
+    /// <param name="g">The green component (0-255).</param>
+    /// <param name="b">The blue component (0-255).</param>
+    /// <returns>A new <see cref="Color"/> instance.</returns>
     public static Color FromRgb(byte r, byte g, byte b) => new(r, g, b);
 
     /// <summary>
     /// Creates a color from RGBA values.
     /// </summary>
+    /// <param name="r">The red component (0-255).</param>
+    /// <param name="g">The green component (0-255).</param>
+    /// <param name="b">The blue component (0-255).</param>
+    /// <param name="a">The alpha/transparency component (0-255).</param>
+    /// <returns>A new <see cref="Color"/> instance.</returns>
     public static Color FromRgba(byte r, byte g, byte b, byte a) => new(r, g, b, a);
 
     /// <summary>
     /// Returns a new color with the specified alpha value.
     /// </summary>
+    /// <param name="alpha">The alpha/transparency component (0-255).</param>
+    /// <returns>A new <see cref="Color"/> instance with updated alpha.</returns>
     public Color WithAlpha(byte alpha) => new(R, G, B, alpha);
 
     /// <summary>
     /// Converts this color to SKColor.
     /// </summary>
+    /// <returns>An <see cref="SKColor"/> representation of this color.</returns>
     public SKColor ToSKColor() => new(R, G, B, A);
+
+    /// <summary>
+    /// Clamps a color channel value to the valid range (0-255).
+    /// </summary>
+    /// <param name="value">The channel value to clamp.</param>
+    /// <returns>The clamped channel value.</returns>
+    private static byte ClampChannel(int value)
+    {
+        if (value < MinChannelValue)
+        {
+            return MinChannelValue;
+        }
+
+        if (value > MaxChannelValue)
+        {
+            return MaxChannelValue;
+        }
+
+        return (byte)value;
+    }
 }
