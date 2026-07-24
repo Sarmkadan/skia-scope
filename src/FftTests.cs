@@ -19,6 +19,7 @@ public static class FftTests
         TestZeroLengthInputThrows();
         TestSingleSampleInput();
         TestNonPowerOfTwoLengthInput();
+        TestWindowedPureToneLeakage();
 
         Console.WriteLine("All FftTests passed successfully.");
     }
@@ -380,5 +381,118 @@ public static class FftTests
         }
 
         Console.WriteLine(" ✓ Non-power-of-two length input (1000 samples)");
+    }
+
+    private static void TestWindowedPureToneLeakage()
+    {
+        Console.WriteLine(" Testing windowed pure tone spectral leakage...");
+
+        var fft = new Fft(1024);
+        var samples = new float[1024];
+
+        // Generate a pure sine wave at bin 10
+        float frequencyBin = 10.0f;
+        for (int i = 0; i < 1024; i++)
+        {
+            samples[i] = MathF.Sin(2.0f * MathF.PI * frequencyBin * i / 1024.0f);
+        }
+
+        // Test with Rectangular window (no windowing) - should have high leakage
+        var magnitudesRectangular = fft.ComputeMagnitudeSpectrum(samples, WindowFunction.Rectangular);
+        float maxMagnitudeRectangular = 0.0f;
+        int maxBinRectangular = 0;
+        for (int i = 0; i < magnitudesRectangular.Length; i++)
+        {
+            if (magnitudesRectangular[i] > maxMagnitudeRectangular)
+            {
+                maxMagnitudeRectangular = magnitudesRectangular[i];
+                maxBinRectangular = i;
+            }
+        }
+
+        // With rectangular window, energy should be spread across many bins
+        // The peak should not be as concentrated as with proper windowing
+        float energyInPeakBinRectangular = maxMagnitudeRectangular * maxMagnitudeRectangular;
+        float totalEnergyRectangular = 0.0f;
+        for (int i = 0; i < magnitudesRectangular.Length; i++)
+        {
+            totalEnergyRectangular += magnitudesRectangular[i] * magnitudesRectangular[i];
+        }
+
+        float peakEnergyRatioRectangular = energyInPeakBinRectangular / totalEnergyRectangular;
+
+        // With rectangular window, we expect significant leakage (peak contains < 30% of energy)
+        if (peakEnergyRatioRectangular > 0.30f)
+        {
+            throw new Exception(
+                $"Rectangular window should have high leakage: peak contains {peakEnergyRatioRectangular * 100:F1}% of energy, expected < 30%");
+        }
+
+        // Test with Hann window - should have reduced leakage
+        var magnitudesHann = fft.ComputeMagnitudeSpectrum(samples, WindowFunction.Hann);
+        float maxMagnitudeHann = 0.0f;
+        int maxBinHann = 0;
+        for (int i = 0; i < magnitudesHann.Length; i++)
+        {
+            if (magnitudesHann[i] > maxMagnitudeHann)
+            {
+                maxMagnitudeHann = magnitudesHann[i];
+                maxBinHann = i;
+            }
+        }
+
+        float energyInPeakBinHann = maxMagnitudeHann * maxMagnitudeHann;
+        float totalEnergyHann = 0.0f;
+        for (int i = 0; i < magnitudesHann.Length; i++)
+        {
+            totalEnergyHann += magnitudesHann[i] * magnitudesHann[i];
+        }
+
+        float peakEnergyRatioHann = energyInPeakBinHann / totalEnergyHann;
+
+        // With Hann window, we expect reduced leakage (peak contains > 60% of energy)
+        if (peakEnergyRatioHann < 0.60f)
+        {
+            throw new Exception(
+                $"Hann window should reduce leakage: peak contains {peakEnergyRatioHann * 100:F1}% of energy, expected > 60%");
+        }
+
+        // Test with Blackman-Harris window - should have even lower leakage
+        var magnitudesBlackmanHarris = fft.ComputeMagnitudeSpectrum(samples, WindowFunction.BlackmanHarris);
+        float maxMagnitudeBlackmanHarris = 0.0f;
+        int maxBinBlackmanHarris = 0;
+        for (int i = 0; i < magnitudesBlackmanHarris.Length; i++)
+        {
+            if (magnitudesBlackmanHarris[i] > maxMagnitudeBlackmanHarris)
+            {
+                maxMagnitudeBlackmanHarris = magnitudesBlackmanHarris[i];
+                maxBinBlackmanHarris = i;
+            }
+        }
+
+        float energyInPeakBinBlackmanHarris = maxMagnitudeBlackmanHarris * maxMagnitudeBlackmanHarris;
+        float totalEnergyBlackmanHarris = 0.0f;
+        for (int i = 0; i < magnitudesBlackmanHarris.Length; i++)
+        {
+            totalEnergyBlackmanHarris += magnitudesBlackmanHarris[i] * magnitudesBlackmanHarris[i];
+        }
+
+        float peakEnergyRatioBlackmanHarris = energyInPeakBinBlackmanHarris / totalEnergyBlackmanHarris;
+
+        // With Blackman-Harris window, we expect very low leakage (peak contains > 80% of energy)
+        if (peakEnergyRatioBlackmanHarris < 0.80f)
+        {
+            throw new Exception(
+                $"Blackman-Harris window should have very low leakage: peak contains {peakEnergyRatioBlackmanHarris * 100:F1}% of energy, expected > 80%");
+        }
+
+        // Blackman-Harris should have the lowest leakage
+        if (peakEnergyRatioBlackmanHarris < peakEnergyRatioHann)
+        {
+            throw new Exception(
+                "Blackman-Harris window should provide better leakage reduction than Hann window");
+        }
+
+        Console.WriteLine(" ✓ Windowed pure tone spectral leakage");
     }
 }
