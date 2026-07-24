@@ -1,24 +1,18 @@
 using System;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 
 namespace SkiaScope;
 
 /// <summary>
 /// Provides JSON serialization and deserialization extensions for <see cref="CorrelationMeterRenderer"/>.
 /// </summary>
+/// <remarks>
+/// This class uses the shared <see cref="JsonRendererExtensions.JsonOptions"/> contract
+/// for consistent serialization behavior across all renderer types.
+/// </remarks>
 public static class CorrelationMeterRendererJsonExtensions
 {
-    private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false,
-        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        MaxDepth = 64
-    };
+    private static readonly JsonSerializerOptions _jsonOptions = JsonRendererExtensions.JsonOptions;
 
     /// <summary>
     /// Serializes the <see cref="CorrelationMeterRenderer"/> instance to a JSON string.
@@ -32,7 +26,7 @@ public static class CorrelationMeterRendererJsonExtensions
         ArgumentNullException.ThrowIfNull(value);
 
         var options = indented
-            ? new JsonSerializerOptions(_jsonOptions) { WriteIndented = true }
+            ? JsonRendererExtensions.CreateOptions(true)
             : _jsonOptions;
 
         return JsonSerializer.Serialize(value, options);
@@ -51,7 +45,7 @@ public static class CorrelationMeterRendererJsonExtensions
         ArgumentNullException.ThrowIfNull(json);
 
         var result = JsonSerializer.Deserialize<CorrelationMeterRenderer>(json, _jsonOptions);
-        JsonValidationHelper.Validate(result);
+        JsonRendererExtensions.Validate(result);
         return result;
     }
 
@@ -72,7 +66,7 @@ public static class CorrelationMeterRendererJsonExtensions
         try
         {
             value = JsonSerializer.Deserialize<CorrelationMeterRenderer>(json, _jsonOptions);
-            JsonValidationHelper.Validate(value);
+            JsonRendererExtensions.Validate(value);
             return true;
         }
         catch (JsonException)

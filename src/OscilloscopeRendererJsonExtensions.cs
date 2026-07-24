@@ -1,23 +1,18 @@
 using System;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 
 namespace SkiaScope;
 
 /// <summary>
 /// Provides JSON serialization and deserialization extensions for <see cref="OscilloscopeRenderer"/>.
 /// </summary>
+/// <remarks>
+/// This class uses the shared <see cref="JsonRendererExtensions.JsonOptions"/> contract
+/// for consistent serialization behavior across all renderer types.
+/// </remarks>
 public static class OscilloscopeRendererJsonExtensions
 {
-    private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false,
-        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
+    private static readonly JsonSerializerOptions _jsonOptions = JsonRendererExtensions.JsonOptions;
 
     /// <summary>
     /// Serializes the <see cref="OscilloscopeRenderer"/> instance to a JSON string.
@@ -31,7 +26,7 @@ public static class OscilloscopeRendererJsonExtensions
         ArgumentNullException.ThrowIfNull(value);
 
         var options = indented
-            ? new JsonSerializerOptions(_jsonOptions) { WriteIndented = true }
+            ? JsonRendererExtensions.CreateOptions(true)
             : _jsonOptions;
 
         return JsonSerializer.Serialize(value, options);
@@ -43,6 +38,7 @@ public static class OscilloscopeRendererJsonExtensions
     /// <param name="json">The JSON string to deserialize.</param>
     /// <returns>The deserialized <see cref="OscilloscopeRenderer"/> instance, or <see langword="null"/> if deserialization fails.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+    /// <exception cref="JsonException">The JSON is invalid.</exception>
     public static OscilloscopeRenderer? FromJson(string json)
     {
         ArgumentNullException.ThrowIfNull(json);

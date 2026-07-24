@@ -1,22 +1,18 @@
 using System;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Collections.Generic;
 
 namespace SkiaScope;
 
 /// <summary>
 /// Provides JSON serialization and deserialization extensions for <see cref="GridRenderer"/>.
 /// </summary>
+/// <remarks>
+/// This class uses the shared <see cref="JsonRendererExtensions.JsonOptions"/> contract
+/// for consistent serialization behavior across all renderer types.
+/// </remarks>
 public static class GridRendererJsonExtensions
 {
-    private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        MaxDepth = 64
-    };
+    private static readonly JsonSerializerOptions _jsonOptions = JsonRendererExtensions.JsonOptions;
 
     /// <summary>
     /// Serializes a <see cref="GridRenderer"/> instance to a JSON string.
@@ -30,7 +26,7 @@ public static class GridRendererJsonExtensions
         ArgumentNullException.ThrowIfNull(value);
 
         var options = indented
-            ? new JsonSerializerOptions(_jsonOptions) { WriteIndented = true }
+            ? JsonRendererExtensions.CreateOptions(true)
             : _jsonOptions;
 
         return JsonSerializer.Serialize(value, options);
@@ -49,7 +45,7 @@ public static class GridRendererJsonExtensions
         ArgumentNullException.ThrowIfNull(json);
 
         var result = JsonSerializer.Deserialize<GridRenderer>(json, _jsonOptions);
-        JsonValidationHelper.Validate(result);
+        JsonRendererExtensions.Validate(result);
         return result;
     }
 
@@ -70,7 +66,7 @@ public static class GridRendererJsonExtensions
         try
         {
             value = JsonSerializer.Deserialize<GridRenderer>(json, _jsonOptions);
-            JsonValidationHelper.Validate(value);
+            JsonRendererExtensions.Validate(value);
             return true;
         }
         catch (JsonException)

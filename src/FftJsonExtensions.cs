@@ -1,26 +1,18 @@
 using System;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Collections.Generic;
 
 namespace SkiaScope;
 
 /// <summary>
 /// Provides JSON serialization and deserialization extension methods for <see cref="Fft"/> instances.
 /// </summary>
+/// <remarks>
+/// This class uses the shared <see cref="JsonRendererExtensions.JsonOptions"/> contract
+/// for consistent serialization behavior across all renderer types.
+/// </remarks>
 public static class FftJsonExtensions
 {
-    /// <summary>
-    /// Cached <see cref="JsonSerializerOptions"/> with camelCase naming, a safe maximum depth,
-    /// and default settings.
-    /// </summary>
-    private static readonly JsonSerializerOptions _jsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        MaxDepth = 64
-    };
+    private static readonly JsonSerializerOptions _jsonOptions = JsonRendererExtensions.JsonOptions;
 
     /// <summary>
     /// Serializes the <see cref="Fft"/> instance to JSON.
@@ -34,7 +26,7 @@ public static class FftJsonExtensions
         ArgumentNullException.ThrowIfNull(value);
 
         var options = indented
-            ? new JsonSerializerOptions(_jsonOptions) { WriteIndented = true }
+            ? JsonRendererExtensions.CreateOptions(true)
             : _jsonOptions;
 
         return JsonSerializer.Serialize(value, options);
@@ -47,12 +39,13 @@ public static class FftJsonExtensions
     /// <returns>The deserialized and validated <see cref="Fft"/> instance, or <c>null</c> if the JSON is empty.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">The deserialized object failed validation.</exception>
+    /// <exception cref="JsonException">The JSON is invalid.</exception>
     public static Fft? FromJson(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
 
         var result = JsonSerializer.Deserialize<Fft>(json, _jsonOptions);
-        JsonValidationHelper.Validate(result);
+        JsonRendererExtensions.Validate(result);
         return result;
     }
 
@@ -73,7 +66,7 @@ public static class FftJsonExtensions
         try
         {
             value = JsonSerializer.Deserialize<Fft>(json, _jsonOptions);
-            JsonValidationHelper.Validate(value);
+            JsonRendererExtensions.Validate(value);
             return true;
         }
         catch (JsonException)
