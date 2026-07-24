@@ -17,10 +17,16 @@ public sealed class MarkerOverlayRenderer : IScopeRenderer
     /// <summary>
     /// Gets or sets the theme used for rendering.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if value is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if value is invalid.</exception>
     public ScopeTheme Theme
     {
         get => _theme;
-        set => _ = value; // Theme is set in constructor and immutable
+        set
+        {
+            value?.EnsureValid();
+            _ = value; // Theme is set in constructor and immutable
+        }
     }
 
     /// <summary>
@@ -38,11 +44,13 @@ public sealed class MarkerOverlayRenderer : IScopeRenderer
     /// <param name="markers">Array of markers to render.</param>
     /// <param name="horizontal">Whether to render horizontal markers (true) or vertical markers (false).</param>
     /// <param name="theme">Optional theme to use for rendering.</param>
+    /// <exception cref="ArgumentException">Thrown if theme is invalid.</exception>
     public MarkerOverlayRenderer(Marker[] markers, bool horizontal = false, ScopeTheme? theme = null)
     {
         _markers = markers ?? throw new ArgumentNullException(nameof(markers));
         _horizontal = horizontal;
         _theme = theme ?? new ScopeTheme();
+        _theme.EnsureValid();
         _sampleRate = 44100; // Default sample rate
     }
 

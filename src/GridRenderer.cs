@@ -23,9 +23,12 @@ public sealed class GridRenderer
     /// Initializes a new instance of the <see cref="GridRenderer"/> class.
     /// </summary>
     /// <param name="theme">The theme containing colors and styles for rendering.</param>
+    /// <exception cref="ArgumentNullException">Thrown if theme is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if theme is invalid.</exception>
     public GridRenderer(ScopeTheme theme)
     {
         _theme = theme ?? throw new ArgumentNullException(nameof(theme));
+        _theme.EnsureValid();
     }
 
     /// <summary>

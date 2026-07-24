@@ -57,7 +57,8 @@ public static class GridRendererValidation
         if (problems.Count > 0)
         {
             throw new ArgumentException(
-                $"Color is invalid:{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", problems)}");
+                $"Color is invalid:{Environment.NewLine}- {
+                    string.Join($"{Environment.NewLine}- ", problems)}");
         }
     }
 
@@ -68,52 +69,7 @@ public static class GridRendererValidation
     /// <returns>A list of validation problems; empty if valid.</returns>
     public static IReadOnlyList<string> Validate(this ScopeTheme value)
     {
-        if (value is null)
-        {
-            return new[] { "ScopeTheme instance is null" };
-        }
-
-        var problems = new List<string>();
-
-        if (value.GridThickness <= 0)
-        {
-            problems.Add("GridThickness must be greater than 0");
-        }
-
-        if (value.FontSize <= 0)
-        {
-            problems.Add("FontSize must be greater than 0");
-        }
-
-        // Validate colors are not default/empty
-        if (value.GridColor.R == 0 && value.GridColor.G == 0 && value.GridColor.B == 0)
-        {
-            problems.Add("GridColor appears to be default black (0, 0, 0)");
-        }
-
-        if (value.TextColor.R == 0 && value.TextColor.G == 0 && value.TextColor.B == 0)
-        {
-            problems.Add("TextColor appears to be default black (0, 0, 0)");
-        }
-
-        // Validate alpha values
-        if (value.GridColor.A == 0)
-        {
-            problems.Add("GridColor is fully transparent (alpha = 0)");
-        }
-
-        if (value.TextColor.A == 0)
-        {
-            problems.Add("TextColor is fully transparent (alpha = 0)");
-        }
-
-        // Check for very low alpha values that might make text unreadable
-        if (value.TextColor.A < 128)
-        {
-            problems.Add("TextColor has low alpha (< 128) and may be difficult to read");
-        }
-
-        return problems.AsReadOnly();
+        return new ThemeValidator(value).Validate();
     }
 
     /// <summary>
@@ -136,11 +92,6 @@ public static class GridRendererValidation
             throw new ArgumentNullException(nameof(value), "ScopeTheme instance cannot be null");
         }
 
-        var problems = Validate(value);
-        if (problems.Count > 0)
-        {
-            throw new ArgumentException(
-                $"ScopeTheme is invalid:{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", problems)}");
-        }
+        new ThemeValidator(value).EnsureValid();
     }
 }

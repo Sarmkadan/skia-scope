@@ -94,10 +94,16 @@ public bool ShowDbGridLabels
     /// <summary>
     /// Gets or sets the theme used for rendering.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if value is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if value is invalid.</exception>
     public ScopeTheme Theme
     {
         get => _theme;
-        set => _ = value; // Theme is set in constructor and immutable
+        set
+        {
+            value?.EnsureValid();
+            _ = value; // Theme is set in constructor and immutable
+        }
     }
 
     /// <summary>

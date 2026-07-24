@@ -47,10 +47,16 @@ public sealed class LissajousRenderer : IScopeRenderer
     /// <summary>
     /// Gets or sets the theme used for rendering.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if value is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if value is invalid.</exception>
     public ScopeTheme Theme
     {
         get => _theme;
-        set => _ = value; // Theme is set in constructor and immutable
+        set
+        {
+            value?.EnsureValid();
+            _ = value; // Theme is set in constructor and immutable
+        }
     }
 
     /// <summary>
@@ -62,10 +68,12 @@ public sealed class LissajousRenderer : IScopeRenderer
     /// Initializes a new instance of the <see cref="LissajousRenderer"/> class.
     /// </summary>
     /// <param name="sampleRate">The sample rate of the audio data.</param>
+    /// <exception cref="ArgumentException">Thrown if the default theme is invalid.</exception>
     public LissajousRenderer(int sampleRate)
     {
         SampleRate = sampleRate;
         _theme = new ScopeTheme();
+        _theme.EnsureValid();
         _xBuffer = new RingBuffer(PointCount);
         _yBuffer = new RingBuffer(PointCount);
     }

@@ -98,10 +98,16 @@ public sealed class SpectrogramRenderer : IScopeRenderer
     /// <summary>
     /// Gets or sets the theme used for rendering.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if value is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if value is invalid.</exception>
     public ScopeTheme Theme
     {
         get => _theme;
-        set => _ = value; // Theme is set in constructor and immutable
+        set
+        {
+            value?.EnsureValid();
+            _ = value; // Theme is set in constructor and immutable
+        }
     }
 
     /// <summary>
@@ -114,9 +120,11 @@ public sealed class SpectrogramRenderer : IScopeRenderer
     /// </summary>
     /// <param name="theme">The theme containing colors and styles for rendering.</param>
     /// <param name="colorMap">The color map to use for magnitude visualization.</param>
+    /// <exception cref="ArgumentException">Thrown if theme is invalid.</exception>
     public SpectrogramRenderer(ScopeTheme theme, ColorMap colorMap)
     {
         _theme = theme ?? throw new ArgumentNullException(nameof(theme));
+        _theme.EnsureValid();
         _colorMap = colorMap ?? throw new ArgumentNullException(nameof(colorMap));
         _fftSize = 1024;
         _magnitudeBins = _fftSize / 2 + 1;
