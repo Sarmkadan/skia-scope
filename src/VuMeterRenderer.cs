@@ -130,11 +130,13 @@ public sealed class VuMeterRenderer : IScopeRenderer
     /// </summary>
     /// <param name="sampleRate">The sample rate of the audio data.</param>
     /// <param name="channels">The number of audio channels (default: 2).</param>
+    /// <exception cref="ArgumentException">Thrown if the default theme is invalid.</exception>
     public VuMeterRenderer(int sampleRate, int channels = 2)
     {
         _sampleRate = sampleRate;
         _channels = Math.Clamp(channels, 1, 8);
         _theme = new ScopeTheme();
+        _theme.EnsureValid();
 
         // Initialize buffers for RMS and peak tracking
         int bufferSize = Math.Max(1, sampleRate / 100); // 10ms worth of samples
