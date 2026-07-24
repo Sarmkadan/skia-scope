@@ -1,0 +1,2707 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>SkiaScope</name>
+    </assembly>
+    <members>
+        <member name="T:SkiaScope.AutoTrigger">
+            <summary>
+            Auto-trigger mode that automatically falls back to free-run when no trigger is found within a timeout.
+            This is the standard scope behavior where the display is continuously updated regardless of trigger conditions.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.AutoTrigger.FallbackTrigger">
+            <summary>
+            Gets the fallback trigger that will be used when no trigger is found within the timeout.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.AutoTrigger.Timeout">
+            <summary>
+            Gets the timeout duration before falling back to free-run mode.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.AutoTrigger.#ctor(System.TimeSpan,SkiaScope.ITrigger)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.AutoTrigger"/> class.
+            </summary>
+            <param name="timeout">The timeout duration before falling back to free-run mode.</param>
+            <param name="fallbackTrigger">Optional fallback trigger to use when conditions are met. If null, always returns free-run.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if timeout is negative or zero.</exception>
+        </member>
+        <member name="M:SkiaScope.AutoTrigger.FindTriggerIndex(System.ReadOnlySpan{System.Single})">
+             <summary>
+             Finds the optimal starting index for waveform alignment.
+            
+             In auto-trigger mode:
+             - If a trigger is found within the timeout window, returns that trigger index
+             - If no trigger is found within the timeout window, returns null (free-run mode)
+             - If fallbackTrigger is configured, uses it to find the trigger index
+             </summary>
+             <param name="signal">The input signal to analyze for trigger conditions.</param>
+             <returns>The index where alignment should start, or null for free-run.</returns>
+             <exception cref="T:System.ArgumentNullException">Thrown if signal is null.</exception>
+        </member>
+        <member name="M:SkiaScope.AutoTrigger.CreateDefault(System.Nullable{System.TimeSpan},SkiaScope.ITrigger)">
+            <summary>
+            Creates an AutoTrigger with a default timeout of 500ms.
+            </summary>
+            <param name="timeout">Optional timeout duration. Defaults to 500ms if null.</param>
+            <param name="fallbackTrigger">Optional fallback trigger to use when conditions are met.</param>
+            <returns>A new AutoTrigger instance.</returns>
+        </member>
+        <member name="T:SkiaScope.CaptureMetadata">
+            <summary>
+            Represents the metadata that accompanies a scope snapshot capture.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.CaptureMetadata.SampleRate">
+            <summary>
+            Gets the sample rate (in Hz) of the audio data used for the capture.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.CaptureMetadata.FftSize">
+            <summary>
+            Gets the FFT size that was used for any frequency‑domain analysis (if applicable).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.CaptureMetadata.ThemeName">
+            <summary>
+            Gets the name of the theme that was applied during rendering.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.CaptureMetadata.Timestamp">
+            <summary>
+            Gets the timestamp (UTC) when the capture was performed.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.CaptureMetadata.#ctor(System.Int32,System.Nullable{System.Int32},System.String,System.DateTime)">
+            <summary>
+            Initializes a new instance of <see cref="T:SkiaScope.CaptureMetadata"/>.
+            </summary>
+            <param name="sampleRate">Sample rate in Hz.</param>
+            <param name="fftSize">FFT size, or <c>null</c> if not applicable.</param>
+            <param name="themeName">Name of the theme used for rendering.</param>
+            <param name="timestamp">Timestamp of the capture (UTC).</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when <paramref name="sampleRate"/> is not positive.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when <paramref name="themeName"/> is null or whitespace.</exception>
+        </member>
+        <member name="T:SkiaScope.ColorMap">
+            <summary>
+            A color map that maps a value to a color based on a set of color stops.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.ColorMap.NaNSentinelColor">
+            <summary>
+            Gets the color used to represent NaN (Not a Number) values.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.ColorMap.PositiveInfinitySentinelColor">
+            <summary>
+            Gets the color used to represent positive infinity values.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.ColorMap.NegativeInfinitySentinelColor">
+            <summary>
+            Gets the color used to represent negative infinity values.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.ColorMap.#ctor(SkiaSharp.SKColor[])">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.ColorMap"/> class.
+            </summary>
+            <param name="stops">The color stops to use in the color map.</param>
+        </member>
+        <member name="M:SkiaScope.ColorMap.Map(System.Single)">
+            <summary>
+            Maps a value to a color based on the color stops in this color map.
+            </summary>
+            <remarks>
+            Handles special floating-point values:
+            <list type="bullet">
+              <item><description>NaN values are mapped to <see cref="P:SkiaScope.ColorMap.NaNSentinelColor"/></description></item>
+              <item><description>Positive infinity is mapped to <see cref="P:SkiaScope.ColorMap.PositiveInfinitySentinelColor"/></description></item>
+              <item><description>Negative infinity is mapped to <see cref="P:SkiaScope.ColorMap.NegativeInfinitySentinelColor"/></description></item>
+              <item><description>Out-of-range values are clamped to [0, 1]</description></item>
+            </list>
+            </remarks>
+            <param name="value">The value to map. Can be any float value including NaN, ±Infinity, or values outside [0, 1].</param>
+            <returns>The color that corresponds to the value. Returns a sentinel color for special values.</returns>
+        </member>
+        <member name="M:SkiaScope.ColorMap.ToLut(System.Int32)">
+            <summary>
+            Creates a lookup table (LUT) from this color map.
+            </summary>
+            <param name="size">The size of the LUT.</param>
+            <returns>The LUT.</returns>
+        </member>
+        <member name="M:SkiaScope.ColorMap.Lerp(SkiaSharp.SKColor,SkiaSharp.SKColor,System.Single)">
+            <summary>
+            Linearly interpolates between two colors.
+            </summary>
+            <param name="a">The first color.</param>
+            <param name="b">The second color.</param>
+            <param name="t">The interpolation factor.</param>
+            <returns>The interpolated color.</returns>
+        </member>
+        <member name="M:SkiaScope.ColorMap.Viridis">
+            <summary>
+            Creates a new <see cref="T:SkiaScope.ColorMap"/> instance with the Viridis color map.
+            </summary>
+            <returns>A new <see cref="T:SkiaScope.ColorMap"/> instance with the Viridis color map.</returns>
+        </member>
+        <member name="M:SkiaScope.ColorMap.Magma">
+            <summary>
+            Creates a new <see cref="T:SkiaScope.ColorMap"/> instance with the Magma color map.
+            </summary>
+            <returns>A new <see cref="T:SkiaScope.ColorMap"/> instance with the Magma color map.</returns>
+        </member>
+        <member name="M:SkiaScope.ColorMap.Inferno">
+            <summary>
+            Creates a new <see cref="T:SkiaScope.ColorMap"/> instance with the Inferno color map.
+            </summary>
+            <returns>A new <see cref="T:SkiaScope.ColorMap"/> instance with the Inferno color map.</returns>
+        </member>
+        <member name="M:SkiaScope.ColorMap.Grayscale">
+            <summary>
+            Creates a new <see cref="T:SkiaScope.ColorMap"/> instance with the Grayscale color map.
+            </summary>
+            <returns>A new <see cref="T:SkiaScope.ColorMap"/> instance with the Grayscale color map.</returns>
+        </member>
+        <member name="T:SkiaScope.ColorMapExtensions">
+            <summary>
+            Extension methods for <see cref="T:SkiaScope.ColorMap"/> that provide additional functionality for working with color maps.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.ColorMapExtensions.Reverse(SkiaScope.ColorMap)">
+            <summary>
+            Creates a reversed version of this color map, where colors are mapped in the opposite direction.
+            </summary>
+            <param name="colorMap">The color map to reverse.</param>
+            <returns>A new color map with colors in reverse order.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when <paramref name="colorMap"/> is null.</exception>
+        </member>
+        <member name="M:SkiaScope.ColorMapExtensions.Blend(SkiaScope.ColorMap,SkiaScope.ColorMap,System.Single)">
+            <summary>
+            Creates a new color map by blending this color map with another color map.
+            </summary>
+            <param name="colorMap">The source color map.</param>
+            <param name="other">The color map to blend with.</param>
+            <param name="factor">The blending factor (0.0 to 1.0).</param>
+            <returns>A new blended color map.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when <paramref name="colorMap"/> or <paramref name="other"/> is null.</exception>
+        </member>
+        <member name="M:SkiaScope.ColorMapExtensions.Resample(SkiaScope.ColorMap,System.Int32)">
+            <summary>
+            Creates a new color map with the specified number of color stops evenly distributed.
+            </summary>
+            <param name="colorMap">The color map to resample.</param>
+            <param name="stopCount">The number of color stops to create. Must be at least 2.</param>
+            <returns>A new color map with the specified number of stops.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when <paramref name="colorMap"/> is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when <paramref name="stopCount"/> is less than 2.</exception>
+        </member>
+        <member name="M:SkiaScope.ColorMapExtensions.WithAlpha(SkiaScope.ColorMap,System.Single)">
+            <summary>
+            Creates a new color map with the alpha channel adjusted by the specified factor.
+            </summary>
+            <param name="colorMap">The color map to adjust.</param>
+            <param name="alphaFactor">The alpha adjustment factor (0.0 to 1.0).</param>
+            <returns>A new color map with adjusted alpha values.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when <paramref name="colorMap"/> is null.</exception>
+        </member>
+        <member name="M:SkiaScope.ColorMapExtensions.Lerp(SkiaSharp.SKColor,SkiaSharp.SKColor,System.Single)">
+            <summary>
+            Linearly interpolates between two colors.
+            </summary>
+            <param name="a">The first color.</param>
+            <param name="b">The second color.</param>
+            <param name="t">The interpolation factor.</param>
+            <returns>The interpolated color.</returns>
+        </member>
+        <member name="T:SkiaScope.CompositeScopeRenderer">
+            <summary>
+            A composite renderer that manages multiple child renderers, rendering them in sequence
+            and propagating theme and sample rate changes.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRenderer.#ctor(SkiaScope.ScopeTheme)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.CompositeScopeRenderer"/> class.
+            </summary>
+            <param name="theme">The initial theme to apply to this renderer and all its children.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if theme is null.</exception>
+        </member>
+        <member name="P:SkiaScope.CompositeScopeRenderer.Theme">
+            <inheritdoc/>
+            <exception cref="T:System.ArgumentNullException">Thrown if value is null.</exception>
+        </member>
+        <member name="P:SkiaScope.CompositeScopeRenderer.SampleRate">
+            <inheritdoc/>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRenderer.PushSamples(System.ReadOnlySpan{System.Single})">
+            <inheritdoc/>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRenderer.Render(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <inheritdoc/>
+            <exception cref="T:System.ArgumentNullException">Thrown if canvas is null.</exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRenderer.AddRenderer(SkiaScope.IScopeRenderer,System.Boolean)">
+            <summary>
+            Adds a renderer as a new layer.
+            </summary>
+            <param name="renderer">The renderer to add.</param>
+            <param name="enabled">Whether the layer is enabled by default.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if renderer is null.</exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRenderer.SetEnabled(SkiaScope.IScopeRenderer,System.Boolean)">
+            <summary>
+            Sets the enabled state of a specific renderer.
+            </summary>
+            <param name="renderer">The renderer whose state to change.</param>
+            <param name="enabled">The new enabled state.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if renderer is null.</exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRenderer.MoveRenderer(SkiaScope.IScopeRenderer,System.Int32)">
+            <summary>
+            Moves a renderer to a new index in the z-order (rendering order).
+            </summary>
+            <param name="renderer">The renderer to move.</param>
+            <param name="newIndex">The target index.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if renderer is null.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if newIndex is invalid.</exception>
+        </member>
+        <member name="T:SkiaScope.CompositeScopeRendererExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.CompositeScopeRenderer"/> to enhance its functionality
+            with common composite renderer operations and utilities.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererExtensions.GetLayerCount(SkiaScope.CompositeScopeRenderer)">
+            <summary>
+            Gets the number of child renderers in the composite.
+            </summary>
+            <param name="renderer">The composite renderer instance.</param>
+            <returns>The number of child renderers.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererExtensions.GetLayer(SkiaScope.CompositeScopeRenderer,System.Int32)">
+            <summary>
+            Gets the child renderer at the specified index.
+            </summary>
+            <param name="renderer">The composite renderer instance.</param>
+            <param name="index">The layer index.</param>
+            <returns>The child renderer, or null if out of range.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if index is out of range.</exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererExtensions.AddLayer(SkiaScope.CompositeScopeRenderer,SkiaScope.IScopeRenderer)">
+            <summary>
+            Adds a child renderer to the composite.
+            </summary>
+            <param name="renderer">The composite renderer instance.</param>
+            <param name="childRenderer">The renderer to add.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> or <paramref name="childRenderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererExtensions.RemoveLayer(SkiaScope.CompositeScopeRenderer,SkiaScope.IScopeRenderer)">
+            <summary>
+            Removes a child renderer from the composite.
+            </summary>
+            <param name="renderer">The composite renderer instance.</param>
+            <param name="childRenderer">The renderer to remove.</param>
+            <returns>True if the renderer was found and removed.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> or <paramref name="childRenderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererExtensions.SetLayerEnabled(SkiaScope.CompositeScopeRenderer,System.Int32,System.Boolean)">
+            <summary>
+            Sets whether a specific layer is enabled.
+            </summary>
+            <param name="renderer">The composite renderer instance.</param>
+            <param name="index">The layer index.</param>
+            <param name="enabled">Whether the layer is enabled.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if index is out of range.</exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererExtensions.IsLayerEnabled(SkiaScope.CompositeScopeRenderer,System.Int32)">
+            <summary>
+            Gets whether a specific layer is enabled.
+            </summary>
+            <param name="renderer">The composite renderer instance.</param>
+            <param name="index">The layer index.</param>
+            <returns>True if the layer is enabled.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if index is out of range.</exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererExtensions.PushSamplesToLayers(SkiaScope.CompositeScopeRenderer,System.ReadOnlySpan{System.Single})">
+            <summary>
+            Pushes samples to all enabled child renderers.
+            </summary>
+            <param name="renderer">The composite renderer instance.</param>
+            <param name="samples">The audio samples to push.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.CompositeScopeRendererJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extensions for <see cref="T:SkiaScope.CompositeScopeRenderer"/>.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererJsonExtensions.ToJson(SkiaScope.CompositeScopeRenderer,System.Boolean)">
+            <summary>
+            Serializes the <see cref="T:SkiaScope.CompositeScopeRenderer"/> instance to a JSON string.
+            </summary>
+            <param name="value">The composite renderer to serialize.</param>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A JSON string representation of the composite renderer.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string to a <see cref="T:SkiaScope.CompositeScopeRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>The deserialized and validated composite renderer instance.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentException">The deserialized object failed validation.</exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererJsonExtensions.TryFromJson(System.String,SkiaScope.CompositeScopeRenderer@)">
+            <summary>
+            Attempts to deserialize a JSON string to a <see cref="T:SkiaScope.CompositeScopeRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <param name="value">
+            Receives the deserialized and validated composite renderer instance if successful;
+            otherwise, <c>null</c>.
+            </param>
+            <returns><see langword="true"/> if deserialization and validation succeed; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CompositeScopeRendererJsonExtensions.Clone(SkiaScope.CompositeScopeRenderer)">
+            <summary>
+            Clones a composite renderer by serializing and deserializing it.
+            </summary>
+            <param name="renderer">The composite renderer to clone.</param>
+            <returns>A new composite renderer instance with the same configuration, or <see langword="null"/> if cloning fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.CorrelationMeterRenderer">
+            <summary>
+            Correlation meter renderer that computes Pearson correlation of L/R channels over a window
+            and draws a -1..+1 horizontal indicator with grid patterns.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.CorrelationMeterRenderer.Theme">
+            <summary>
+            Gets or sets the theme used for rendering.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown if value is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if value is invalid.</exception>
+        </member>
+        <member name="P:SkiaScope.CorrelationMeterRenderer.SampleRate">
+            <summary>
+            Gets or sets the sample rate of the audio data.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.CorrelationMeterRenderer.WindowSize">
+            <summary>
+            Gets or sets the window size in samples for correlation calculation.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.CorrelationMeterRenderer.Correlation">
+            <summary>
+            Gets the current correlation value (-1 to +1).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.CorrelationMeterRenderer.PeakPositive">
+            <summary>
+            Gets the peak positive correlation value.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.CorrelationMeterRenderer.PeakNegative">
+            <summary>
+            Gets the peak negative correlation value.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRenderer.#ctor(System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.CorrelationMeterRenderer"/> class.
+            </summary>
+            <param name="sampleRate">The sample rate of the audio data.</param>
+            <exception cref="T:System.ArgumentException">Thrown if the default theme is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRenderer.PushSamples(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Pushes audio samples to the renderer.
+            Samples are expected to be interleaved stereo pairs (L, R, L, R, ...).
+            </summary>
+            <param name="samples">Audio samples to be rendered (interleaved stereo).</param>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRenderer.CalculateCorrelation">
+            <summary>
+            Calculates Pearson correlation coefficient between left and right channels.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRenderer.Render(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders the correlation meter visualization to the provided canvas.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+        </member>
+        <member name="T:SkiaScope.CorrelationMeterRendererExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.CorrelationMeterRenderer"/> to enhance its functionality
+            with common correlation meter operations and utilities.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRendererExtensions.GetCorrelation(SkiaScope.CorrelationMeterRenderer)">
+            <summary>
+            Gets the current correlation value (-1.0 to +1.0).
+            </summary>
+            <param name="renderer">The correlation meter renderer instance.</param>
+            <returns>The correlation value between -1.0 and +1.0.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRendererExtensions.GetPeakPositive(SkiaScope.CorrelationMeterRenderer)">
+            <summary>
+            Gets the peak positive correlation value.
+            </summary>
+            <param name="renderer">The correlation meter renderer instance.</param>
+            <returns>The peak positive correlation value.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRendererExtensions.GetPeakNegative(SkiaScope.CorrelationMeterRenderer)">
+            <summary>
+            Gets the peak negative correlation value.
+            </summary>
+            <param name="renderer">The correlation meter renderer instance.</param>
+            <returns>The peak negative correlation value.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRendererExtensions.SetWindowSize(SkiaScope.CorrelationMeterRenderer,System.Int32)">
+            <summary>
+            Sets the window size in samples for correlation calculation.
+            </summary>
+            <param name="renderer">The correlation meter renderer instance.</param>
+            <param name="windowSize">The window size in samples.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if windowSize is not positive.</exception>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRendererExtensions.ResetPeaks(SkiaScope.CorrelationMeterRenderer)">
+            <summary>
+            Resets the peak values to the current correlation.
+            </summary>
+            <param name="renderer">The correlation meter renderer instance.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.CorrelationMeterRendererJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extensions for <see cref="T:SkiaScope.CorrelationMeterRenderer"/>.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRendererJsonExtensions.ToJson(SkiaScope.CorrelationMeterRenderer,System.Boolean)">
+            <summary>
+            Serializes the <see cref="T:SkiaScope.CorrelationMeterRenderer"/> instance to a JSON string.
+            </summary>
+            <param name="value">The correlation meter renderer to serialize.</param>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A JSON string representation of the correlation meter renderer.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRendererJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string to a <see cref="T:SkiaScope.CorrelationMeterRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>The deserialized and validated correlation meter renderer instance.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentException">The deserialized object failed validation.</exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRendererJsonExtensions.TryFromJson(System.String,SkiaScope.CorrelationMeterRenderer@)">
+            <summary>
+            Attempts to deserialize a JSON string to a <see cref="T:SkiaScope.CorrelationMeterRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <param name="value">
+            Receives the deserialized and validated correlation meter renderer instance if successful;
+            otherwise, <c>null</c>.
+            </param>
+            <returns><see langword="true"/> if deserialization and validation succeed; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.CorrelationMeterRendererJsonExtensions.Clone(SkiaScope.CorrelationMeterRenderer)">
+            <summary>
+            Clones a correlation meter renderer by serializing and deserializing it.
+            </summary>
+            <param name="renderer">The correlation meter renderer to clone.</param>
+            <returns>A new correlation meter renderer instance with the same configuration, or <see langword="null"/> if cloning fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.EdgeTrigger">
+            <summary>
+            Detects rising-edge crossings in a signal with hysteresis and holdoff.
+            Returns the index of the first rising edge that crosses the threshold.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.EdgeTrigger.Threshold">
+            <summary>
+            Gets the threshold level for edge detection (normalized -1.0 to 1.0).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.EdgeTrigger.Hysteresis">
+            <summary>
+            Gets the hysteresis band width for edge detection (normalized -1.0 to 1.0).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.EdgeTrigger.HoldoffSamples">
+            <summary>
+            Gets the minimum number of samples between triggers to prevent repeated triggers.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.EdgeTrigger.#ctor(System.Single,System.Single,System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.EdgeTrigger"/> class.
+            </summary>
+            <param name="threshold">The threshold level to cross (rising edge).</param>
+            <param name="hysteresis">Hysteresis band width to prevent noise triggering. Default is 10% of threshold.</param>
+            <param name="holdoffSamples">Minimum number of samples between triggers to prevent repeated triggers. Default is 0 (no holdoff).</param>
+            <exception cref="T:System.ArgumentException">Thrown if threshold is NaN or holdoffSamples is negative.</exception>
+        </member>
+        <member name="M:SkiaScope.EdgeTrigger.FindTriggerIndex(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Finds the first rising-edge crossing in a signal with hysteresis and optional holdoff.
+            </summary>
+            <param name="signal">The input signal to analyze.</param>
+            <returns>The index of the first rising edge crossing, or -1 if no edge found.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown if signal is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if signal length is less than 2.</exception>
+        </member>
+        <member name="M:SkiaScope.EdgeTrigger.CreateWithDefaultHysteresis(System.Single)">
+            <summary>
+            Creates an EdgeTrigger with default hysteresis (10% of threshold).
+            </summary>
+            <param name="threshold">The threshold level to cross (rising edge).</param>
+            <returns>A new EdgeTrigger instance.</returns>
+            <exception cref="T:System.ArgumentException">Thrown if threshold is NaN.</exception>
+        </member>
+        <member name="T:SkiaScope.FftWindow">
+            <summary>
+            Specifies the window function to apply before FFT computation.
+            </summary>
+        </member>
+        <member name="F:SkiaScope.FftWindow.None">
+            <summary>
+            No windowing (rectangular window) - preserves all signal energy but may have high spectral leakage.
+            </summary>
+        </member>
+        <member name="F:SkiaScope.FftWindow.Hann">
+            <summary>
+            Hann window - good general-purpose window with moderate spectral leakage reduction.
+            </summary>
+        </member>
+        <member name="F:SkiaScope.FftWindow.Hamming">
+            <summary>
+            Hamming window - similar to Hann but with different coefficients for better side-lobe suppression.
+            </summary>
+        </member>
+        <member name="T:SkiaScope.Fft">
+            <summary>
+            Computes the frequency spectrum of real-valued audio buffers using an
+            iterative radix-2 Cooley-Tukey Fast Fourier Transform.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.Fft.#ctor(System.Int32,SkiaScope.FftWindow)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.Fft"/> class.
+            </summary>
+            <param name="size">
+            The number of samples processed per transform. Must be a positive power of two.
+            </param>
+            <param name="window">
+            The window function to apply before FFT computation. Defaults to <see cref="F:SkiaScope.FftWindow.Hann"/>.
+            </param>
+            <exception cref="T:System.ArgumentException"><paramref name="size"/> is not a positive power of two.</exception>
+        </member>
+        <member name="P:SkiaScope.Fft.Size">
+            <summary>
+            Gets the number of samples processed per transform.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.Fft.ComputeMagnitudeSpectrum(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Computes the magnitude spectrum for the given audio samples.
+            </summary>
+            <param name="samples">
+            The input samples. If shorter than <see cref="P:SkiaScope.Fft.Size"/> the remainder is zero-padded;
+            if longer, only the first <see cref="P:SkiaScope.Fft.Size"/> samples are used.
+            </param>
+            <returns>
+            An array of length <c>Size / 2 + 1</c> containing the magnitude of each
+            non-negative frequency bin (bin 0 is DC, the last bin is Nyquist).
+            </returns>
+            <exception cref="T:System.ArgumentException">
+            <paramref name="samples"/> is empty (length 0).
+            </exception>
+        </member>
+        <member name="M:SkiaScope.Fft.ComputeMagnitudeSpectrum(System.ReadOnlySpan{System.Single},System.Span{System.Single})">
+            <summary>
+            Computes the magnitude spectrum and writes results into the provided output span.
+            </summary>
+            <param name="samples">
+            The input samples. If shorter than <see cref="P:SkiaScope.Fft.Size"/> the remainder is zero-padded;
+            if longer, only the first <see cref="P:SkiaScope.Fft.Size"/> samples are used.
+            </param>
+            <param name="magnitudes">
+            The span to write magnitude results into. Must have length of at least <c>Size / 2 + 1</c>.
+            </param>
+            <exception cref="T:System.ArgumentException">
+            <paramref name="samples"/> is empty (length 0) or <paramref name="magnitudes"/> is too small.
+            </exception>
+        </member>
+        <member name="M:SkiaScope.Fft.Transform(System.Span{System.Single},System.Span{System.Single})">
+            <summary>
+            Performs an in-place iterative radix-2 Cooley-Tukey FFT on the given real and
+            imaginary components.
+            </summary>
+            <param name="real">The real components; overwritten with the transform's real part.</param>
+            <param name="imaginary">The imaginary components; overwritten with the transform's imaginary part.</param>
+            <exception cref="T:System.ArgumentException">
+            <paramref name="real"/> or <paramref name="imaginary"/> does not have length equal to <see cref="P:SkiaScope.Fft.Size"/>.
+            </exception>
+        </member>
+        <member name="M:SkiaScope.Fft.ApplyWindow(System.ReadOnlySpan{System.Single},System.Span{System.Single})">
+            <summary>
+            Applies the window function to the input samples.
+            </summary>
+            <param name="input">The input samples to window.</param>
+            <param name="output">The span to write windowed samples into.</param>
+            <exception cref="T:System.ArgumentException">
+            <paramref name="input"/> is empty or <paramref name="output"/> is too small.
+            </exception>
+        </member>
+        <member name="M:SkiaScope.Fft.PrecomputeWindowCoefficients">
+            <summary>
+            Precomputes window coefficients for the configured window type.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.Fft.PrecomputeTwiddleFactors">
+            <summary>
+            Precomputes twiddle factors for all butterfly stages.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.Fft.GetWindowCoefficients(SkiaScope.FftWindow)">
+            <summary>
+            Gets the window function coefficients for the specified window type.
+            </summary>
+            <param name="window">The window function type.</param>
+            <returns>An array of window coefficients.</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            Thrown if <paramref name="window"/> is not a valid <see cref="T:SkiaScope.FftWindow"/> value.
+            </exception>
+        </member>
+        <member name="T:SkiaScope.FftJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extension methods for <see cref="T:SkiaScope.Fft"/> instances.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.FftJsonExtensions.ValidateFftNumericValues(SkiaScope.Fft)">
+            <summary>
+            Validates numeric ranges in an Fft instance to prevent NaN/Infinity or out-of-range values.
+            </summary>
+            <param name="fft">The FFT instance to validate.</param>
+            <exception cref="T:System.ArgumentException">Thrown if numeric values are invalid (NaN, Infinity, or out of range).</exception>
+        </member>
+        <member name="M:SkiaScope.FftJsonExtensions.ToJson(SkiaScope.Fft,System.Boolean)">
+            <summary>
+            Serializes the <see cref="T:SkiaScope.Fft"/> instance to JSON.
+            </summary>
+            <param name="value">The <see cref="T:SkiaScope.Fft"/> instance to serialize.</param>
+            <param name="indented">If <see langword="true"/>, the output JSON will be indented.</param>
+            <returns>A JSON string representing the <see cref="T:SkiaScope.Fft"/> instance.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.FftJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string into an <see cref="T:SkiaScope.Fft"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string.</param>
+            <returns>The deserialized and validated <see cref="T:SkiaScope.Fft"/> instance, or <c>null</c> if the JSON is empty.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentException">
+            The deserialized object failed validation or the Size parameter is out of valid range.
+            </exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.FftJsonExtensions.TryFromJson(System.String,SkiaScope.Fft@)">
+            <summary>
+            Attempts to deserialize a JSON string into an <see cref="T:SkiaScope.Fft"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string.</param>
+            <param name="value">
+            When this method returns, contains the deserialized and validated <see cref="T:SkiaScope.Fft"/> instance
+            if the operation succeeded; otherwise, <c>null</c>.
+            </param>
+            <returns><see langword="true"/> if deserialization and validation succeeded; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.GridRenderer">
+            <summary>
+            Renders grid overlays for scope visualizations. Implements IScopeRenderer to allow
+            uniform treatment in composite pipelines alongside other scope renderers.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.GridRenderer.ShowLabels">
+            <summary>
+            Gets or sets whether to show grid labels.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.GridRenderer.Theme">
+            <summary>
+            Gets or sets the theme used for rendering.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown if value is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if value is invalid.</exception>
+        </member>
+        <member name="P:SkiaScope.GridRenderer.SampleRate">
+            <summary>
+            Gets or sets the sample rate of the audio data.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.GridRenderer.#ctor(SkiaScope.ScopeTheme)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.GridRenderer"/> class.
+            </summary>
+            <param name="theme">The theme containing colors and styles for rendering.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if theme is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if theme is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRenderer.PushSamples(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Pushes audio samples to the renderer.
+            This renderer doesn't process audio samples directly, but implements the interface for compatibility.
+            </summary>
+            <param name="samples">Audio samples to be rendered.</param>
+        </member>
+        <member name="M:SkiaScope.GridRenderer.Render(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders the grid visualization to the provided canvas.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if canvas is null.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRenderer.DrawLinearGrid(SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Int32,System.Int32)">
+            <summary>
+            Draws a linear grid with equally spaced divisions.
+            </summary>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="xDivisions">Number of vertical divisions.</param>
+            <param name="yDivisions">Number of horizontal divisions.</param>
+        </member>
+        <member name="M:SkiaScope.GridRenderer.DrawDbGrid(SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Single,System.Single,System.Single)">
+            <summary>
+            Draws a dB scale grid with horizontal lines and labels.
+            </summary>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="minDb">Minimum dB value.</param>
+            <param name="maxDb">Maximum dB value.</param>
+            <param name="stepDb">Step size between grid lines in dB.</param>
+        </member>
+        <member name="M:SkiaScope.GridRenderer.DrawLogFrequencyGrid(SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Single,System.Single)">
+            <summary>
+            Draws a logarithmic frequency grid with decade markers and labels.
+            </summary>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="minHz">Minimum frequency in Hz.</param>
+            <param name="maxHz">Maximum frequency in Hz.</param>
+        </member>
+        <member name="T:SkiaScope.ScopeTheme">
+            <summary>
+            Contains theme settings for scope visualizations including colors and styles.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.ScopeTheme.GridColor">
+            <summary>
+            Gets the grid color.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.ScopeTheme.TextColor">
+            <summary>
+            Gets the text color.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.ScopeTheme.GridThickness">
+            <summary>
+            Gets the grid line thickness.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.ScopeTheme.FontSize">
+            <summary>
+            Gets the font size for labels.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.ScopeTheme.EnsureValid">
+            <summary>
+            Ensures the theme values are valid.
+            </summary>
+            <exception cref="T:System.ArgumentException">Thrown if theme is invalid.</exception>
+        </member>
+        <member name="T:SkiaScope.Color">
+            <summary>
+            Represents an RGBA color.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.Color.R">
+            <summary>
+            Gets the red component.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.Color.G">
+            <summary>
+            Gets the green component.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.Color.B">
+            <summary>
+            Gets the blue component.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.Color.A">
+            <summary>
+            Gets the alpha component.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.Color.#ctor(System.Byte,System.Byte,System.Byte,System.Byte)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.Color"/> struct.
+            </summary>
+            <param name="r">The red component (0-255).</param>
+            <param name="g">The green component (0-255).</param>
+            <param name="b">The blue component (0-255).</param>
+            <param name="a">The alpha/transparency component (0-255).</param>
+        </member>
+        <member name="M:SkiaScope.Color.FromRgb(System.Byte,System.Byte,System.Byte)">
+            <summary>
+            Creates a color from RGB values.
+            </summary>
+            <param name="r">The red component (0-255).</param>
+            <param name="g">The green component (0-255).</param>
+            <param name="b">The blue component (0-255).</param>
+            <returns>A new <see cref="T:SkiaScope.Color"/> instance.</returns>
+        </member>
+        <member name="M:SkiaScope.Color.FromRgba(System.Byte,System.Byte,System.Byte,System.Byte)">
+            <summary>
+            Creates a color from RGBA values.
+            </summary>
+            <param name="r">The red component (0-255).</param>
+            <param name="g">The green component (0-255).</param>
+            <param name="b">The blue component (0-255).</param>
+            <param name="a">The alpha/transparency component (0-255).</param>
+            <returns>A new <see cref="T:SkiaScope.Color"/> instance.</returns>
+        </member>
+        <member name="M:SkiaScope.Color.WithAlpha(System.Byte)">
+            <summary>
+            Returns a new color with the specified alpha value.
+            </summary>
+            <param name="alpha">The alpha/transparency component (0-255).</param>
+            <returns>A new <see cref="T:SkiaScope.Color"/> instance with updated alpha.</returns>
+        </member>
+        <member name="M:SkiaScope.Color.ToSKColor">
+            <summary>
+            Converts this color to SKColor.
+            </summary>
+            <returns>An <see cref="T:SkiaSharp.SKColor"/> representation of this color.</returns>
+        </member>
+        <member name="M:SkiaScope.Color.ClampChannel(System.Int32)">
+            <summary>
+            Clamps a color channel value to the valid range (0-255).
+            </summary>
+            <param name="value">The channel value to clamp.</param>
+            <returns>The clamped channel value.</returns>
+        </member>
+        <member name="T:SkiaScope.GridRendererExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.GridRenderer"/> to simplify common grid rendering operations.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.GridRendererExtensions.DrawLinearGrid(SkiaScope.GridRenderer,SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Int32)">
+            <summary>
+            Draws a linear grid with equally spaced divisions using the theme's default colors and styles.
+            </summary>
+            <param name="renderer">The grid renderer instance.</param>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="divisions">Number of divisions in both X and Y directions.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="divisions"/> is less than 1.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererExtensions.DrawLinearGrid(SkiaScope.GridRenderer,SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Int32,System.Int32)">
+            <summary>
+            Draws a linear grid with the specified number of divisions in each direction.
+            </summary>
+            <param name="renderer">The grid renderer instance.</param>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="xDivisions">Number of vertical divisions.</param>
+            <param name="yDivisions">Number of horizontal divisions.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="xDivisions"/> or <paramref name="yDivisions"/> is less than 1.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererExtensions.DrawDbGrid(SkiaScope.GridRenderer,SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Single,System.Single,System.Single)">
+            <summary>
+            Draws a dB scale grid with customizable range and step.
+            </summary>
+            <param name="renderer">The grid renderer instance.</param>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="minDb">Minimum dB value.</param>
+            <param name="maxDb">Maximum dB value.</param>
+            <param name="stepDb">Step size between grid lines in dB.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="stepDb"/> is not positive.</exception>
+            <exception cref="T:System.ArgumentException"><paramref name="minDb"/> is not less than <paramref name="maxDb"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererExtensions.DrawLogFrequencyGrid(SkiaScope.GridRenderer,SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Single,System.Single)">
+            <summary>
+            Draws a logarithmic frequency grid with decade markers.
+            </summary>
+            <param name="renderer">The grid renderer instance.</param>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="minHz">Minimum frequency in Hz.</param>
+            <param name="maxHz">Maximum frequency in Hz.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="minHz"/> or <paramref name="maxHz"/> is not positive.</exception>
+            <exception cref="T:System.ArgumentException"><paramref name="minHz"/> is not less than <paramref name="maxHz"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererExtensions.DrawCenteredLinearGrid(SkiaScope.GridRenderer,SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Int32,System.Single)">
+            <summary>
+            Draws a centered grid that maintains aspect ratio within the bounds.
+            </summary>
+            <param name="renderer">The grid renderer instance.</param>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="divisions">Number of divisions.</param>
+            <param name="marginRatio">Margin ratio (0.0 to 0.5) to leave around the grid.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="divisions"/> is less than 1.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="marginRatio"/> is not between 0 and 0.5.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererExtensions.DrawOffsetLinearGrid(SkiaScope.GridRenderer,SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Int32,System.Int32,System.Single,System.Single)">
+            <summary>
+            Draws a grid with custom bounds that can be offset from the main drawing area.
+            </summary>
+            <param name="renderer">The grid renderer instance.</param>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="xDivisions">Number of vertical divisions.</param>
+            <param name="yDivisions">Number of horizontal divisions.</param>
+            <param name="xOffset">Horizontal offset from left edge.</param>
+            <param name="yOffset">Vertical offset from top edge.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="xDivisions"/> or <paramref name="yDivisions"/> is less than 1.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererExtensions.DrawAspectRatioGrid(SkiaScope.GridRenderer,SkiaSharp.SKCanvas,SkiaSharp.SKRect,System.Int32,System.Single,System.Single)">
+            <summary>
+            Draws a grid with a specified aspect ratio, scaling to fit within bounds.
+            </summary>
+            <param name="renderer">The grid renderer instance.</param>
+            <param name="canvas">The canvas to draw on.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+            <param name="divisions">Number of divisions.</param>
+            <param name="aspectRatioX">Horizontal aspect ratio component.</param>
+            <param name="aspectRatioY">Vertical aspect ratio component.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentNullException"><paramref name="canvas"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="divisions"/> is less than 1.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="aspectRatioX"/> or <paramref name="aspectRatioY"/> is not positive.</exception>
+        </member>
+        <member name="T:SkiaScope.GridRendererJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extensions for <see cref="T:SkiaScope.GridRenderer"/>.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.GridRendererJsonExtensions.ValidateGridRendererNumericValues(SkiaScope.GridRenderer)">
+            <summary>
+            Validates numeric ranges in a GridRenderer instance to prevent NaN/Infinity or out-of-range values.
+            </summary>
+            <param name="renderer">The renderer to validate.</param>
+            <exception cref="T:System.ArgumentException">Thrown if numeric values are invalid (NaN, Infinity, or out of range).</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererJsonExtensions.ToJson(SkiaScope.GridRenderer,System.Boolean)">
+            <summary>
+            Serializes a <see cref="T:SkiaScope.GridRenderer"/> instance to a JSON string.
+            </summary>
+            <param name="value">The <see cref="T:SkiaScope.GridRenderer"/> instance to serialize.</param>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A JSON string representation of the <see cref="T:SkiaScope.GridRenderer"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string to a <see cref="T:SkiaScope.GridRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>The deserialized and validated <see cref="T:SkiaScope.GridRenderer"/> instance.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentException">The deserialized object failed validation.</exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererJsonExtensions.TryFromJson(System.String,SkiaScope.GridRenderer@)">
+            <summary>
+            Attempts to deserialize a JSON string to a <see cref="T:SkiaScope.GridRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <param name="value">
+            Receives the deserialized and validated <see cref="T:SkiaScope.GridRenderer"/> instance if successful;
+            otherwise, <c>null</c>.
+            </param>
+            <returns><see langword="true"/> if deserialization and validation succeed; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="T:SkiaScope.GridRendererValidation">
+            <summary>
+            Provides validation helpers for <see cref="T:SkiaScope.GridRenderer"/> and related types.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.GridRendererValidation.Validate(SkiaScope.Color)">
+            <summary>
+            Validates a <see cref="T:SkiaScope.Color"/> instance and returns a list of human-readable problems.
+            </summary>
+            <param name="value">The Color instance to validate.</param>
+            <returns>A list of validation problems; empty if valid.</returns>
+        </member>
+        <member name="M:SkiaScope.GridRendererValidation.IsValid(SkiaScope.Color)">
+            <summary>
+            Determines whether a <see cref="T:SkiaScope.Color"/> instance is valid.
+            </summary>
+            <param name="value">The Color instance to validate.</param>
+            <returns>True if valid; otherwise, false.</returns>
+        </member>
+        <member name="M:SkiaScope.GridRendererValidation.EnsureValid(SkiaScope.Color)">
+            <summary>
+            Ensures that a <see cref="T:SkiaScope.Color"/> instance is valid, throwing an exception if not.
+            </summary>
+            <param name="value">The Color instance to validate.</param>
+            <exception cref="T:System.ArgumentException">Thrown if the instance is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.GridRendererValidation.Validate(SkiaScope.ScopeTheme)">
+            <summary>
+            Validates a <see cref="T:SkiaScope.ScopeTheme"/> instance and returns a list of human-readable problems.
+            </summary>
+            <param name="value">The ScopeTheme instance to validate.</param>
+            <returns>A list of validation problems; empty if valid.</returns>
+        </member>
+        <member name="M:SkiaScope.GridRendererValidation.IsValid(SkiaScope.ScopeTheme)">
+            <summary>
+            Determines whether a <see cref="T:SkiaScope.ScopeTheme"/> instance is valid.
+            </summary>
+            <param name="value">The ScopeTheme instance to check.</param>
+            <returns>True if valid; otherwise, false.</returns>
+        </member>
+        <member name="M:SkiaScope.GridRendererValidation.EnsureValid(SkiaScope.ScopeTheme)">
+            <summary>
+            Ensures that a <see cref="T:SkiaScope.ScopeTheme"/> instance is valid, throwing an exception if not.
+            </summary>
+            <param name="value">The ScopeTheme instance to validate.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if the instance is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if the instance is invalid.</exception>
+        </member>
+        <member name="T:SkiaScope.IScopeRenderer">
+            <summary>
+            Represents a renderer capable of visualizing audio scope data.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.IScopeRenderer.PushSamples(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Pushes audio samples to the renderer.
+            </summary>
+            <param name="samples">Audio samples to be rendered.</param>
+        </member>
+        <member name="M:SkiaScope.IScopeRenderer.Render(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders the current scope visualization to the provided canvas.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+        </member>
+        <member name="P:SkiaScope.IScopeRenderer.Theme">
+            <summary>
+            Gets or sets the theme used for rendering.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.IScopeRenderer.SampleRate">
+            <summary>
+            Gets or sets the sample rate of the audio data.
+            </summary>
+        </member>
+        <member name="T:SkiaScope.ITrigger">
+            <summary>
+            Represents a trigger strategy for waveform alignment.
+            Implementations detect trigger conditions in signals and return the optimal starting index.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.ITrigger.FindTriggerIndex(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Finds the optimal starting index for waveform alignment based on trigger conditions.
+            </summary>
+            <param name="signal">The input signal to analyze for trigger conditions.</param>
+            <returns>The index where alignment should start, or null if no specific alignment is needed.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown if signal is null.</exception>
+        </member>
+        <member name="T:SkiaScope.IValidatable">
+            <summary>
+            Represents an object that can be validated for correctness.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.IValidatable.Validate">
+            <summary>
+            Validates the object and returns a list of human-readable problems.
+            </summary>
+            <returns>A list of validation problems; empty if valid.</returns>
+        </member>
+        <member name="M:SkiaScope.IValidatable.IsValid">
+            <summary>
+            Determines whether the object is valid.
+            </summary>
+            <returns>True if valid; otherwise, false.</returns>
+        </member>
+        <member name="M:SkiaScope.IValidatable.EnsureValid">
+            <summary>
+            Ensures that the object is valid, throwing an exception if not.
+            </summary>
+            <exception cref="T:System.ArgumentException">Thrown if the object is invalid.</exception>
+        </member>
+        <member name="T:SkiaScope.JsonRendererExtensions">
+            <summary>
+            Provides a unified JSON serialization contract for all renderer types.
+            This class centralizes the shared <see cref="T:System.Text.Json.JsonSerializerOptions"/> configuration
+            and exception handling contract used by all renderer-specific JSON extension classes.
+            </summary>
+            <remarks>
+            <para>
+            All renderer JSON extension classes should use this shared contract to ensure
+            consistent serialization behavior across the codebase.
+            </para>
+            <para>
+            Exception Contract for FromJson-style methods:
+            <list type="bullet">
+              <item><description><see cref="T:System.ArgumentNullException"/> is thrown when input parameters are null</description></item>
+              <item><description><see cref="T:System.Text.Json.JsonException"/> is thrown when JSON is malformed or cannot be deserialized</description></item>
+              <item><description><see cref="T:System.ArgumentException"/> is thrown when deserialized objects fail validation via <see cref="M:SkiaScope.JsonValidationHelper.Validate(System.Object)"/></description></item>
+            </list>
+            </para>
+            </remarks>
+        </member>
+        <member name="F:SkiaScope.JsonRendererExtensions.JsonOptions">
+            <summary>
+            Shared <see cref="T:System.Text.Json.JsonSerializerOptions"/> instance used by all renderer JSON extension classes.
+            </summary>
+            <remarks>
+            Configuration:
+            <list type="bullet">
+              <item><description><see cref="P:System.Text.Json.JsonNamingPolicy.CamelCase"/> for property naming</description></item>
+              <item><description><see cref="F:System.Text.Json.JsonSerializerDefaults.Web"/> as base configuration</description></item>
+              <item><description><see cref="T:System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver"/> for type resolution</description></item>
+              <item><description><see cref="!:PropertyNameCaseInsensitive"/> = true for case-insensitive parsing</description></item>
+              <item><description><see cref="!:DefaultIgnoreCondition.WhenWritingNull"/> to omit null values</description></item>
+              <item><description><see cref="!:MaxDepth"/> = 64 for safety</description></item>
+            </list>
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.JsonRendererExtensions.CreateOptions(System.Boolean)">
+            <summary>
+            Creates a new <see cref="T:System.Text.Json.JsonSerializerOptions"/> instance based on the shared contract,
+            optionally overriding the <see cref="!:WriteIndented"/> setting.
+            </summary>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A new <see cref="T:System.Text.Json.JsonSerializerOptions"/> instance.</returns>
+        </member>
+        <member name="M:SkiaScope.JsonRendererExtensions.Validate(System.Object)">
+            <summary>
+            Validates a deserialized object using the standard validation contract.
+            </summary>
+            <param name="obj">The object to validate; may be <see langword="null"/>.</param>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the object implements <see cref="T:SkiaScope.IValidatable"/> (or provides an <c>EnsureValid</c>
+            method) and the validation fails.
+            </exception>
+        </member>
+        <member name="T:SkiaScope.JsonValidationHelper">
+            <summary>
+            Helper class that runs validation on deserialized objects using the existing validation
+            infrastructure (<see cref="T:SkiaScope.IValidatable"/> or extension methods like <c>EnsureValid</c>).
+            </summary>
+        </member>
+        <member name="M:SkiaScope.JsonValidationHelper.Validate(System.Object)">
+            <summary>
+            Validates the supplied object if it participates in the validation contract.
+            </summary>
+            <param name="obj">The deserialized object to validate; may be <c>null</c>.</param>
+            <exception cref="T:System.ArgumentException">
+            Thrown when the object implements <see cref="T:SkiaScope.IValidatable"/> (or provides an <c>EnsureValid</c>
+            method) and the validation fails.
+            </exception>
+        </member>
+        <member name="T:SkiaScope.LissajousRenderer">
+            <summary>
+            Lissajous curve renderer that displays stereo phase (X = left sample, Y = right sample) as a fading trail.
+            This creates characteristic Lissajous patterns that visualize the phase relationship between stereo channels.
+            </summary>
+        </member>
+        <member name="F:SkiaScope.LissajousRenderer._intensityBuffer">
+            <summary>
+            Persistent intensity buffer for phosphor persistence mode.
+            Stores normalized intensity values [0, 1] for each pixel position.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.LissajousRenderer.PointCount">
+            <summary>
+            Gets or sets the number of points to display.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.LissajousRenderer.LineWidth">
+            <summary>
+            Gets or sets the line width for drawing.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.LissajousRenderer.AlphaFalloff">
+            <summary>
+            Gets or sets the alpha falloff factor for fading old points (0.9 to 0.999).
+            Higher values mean slower fading.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.LissajousRenderer.PhosphorDecay">
+            <summary>
+            Gets or sets the phosphor decay factor for persistence effect (0.9 to 0.999).
+            Higher values mean slower decay and brighter persistence trails.
+            This property is only used when UsePhosphorPersistence is true.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.LissajousRenderer.UsePhosphorPersistence">
+            <summary>
+            Gets or sets whether to use phosphor persistence mode.
+            When enabled, the renderer accumulates intensity in a float buffer with exponential decay,
+            creating a classic phosphor scope appearance with bright, glowing trails.
+            When disabled, uses simple line-based rendering with age-based alpha falloff.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.LissajousRenderer.Theme">
+            <summary>
+            Gets or sets the theme used for rendering.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown if value is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if value is invalid.</exception>
+        </member>
+        <member name="P:SkiaScope.LissajousRenderer.ColorMap">
+            <summary>
+            Gets or sets the color map used for phosphor persistence visualization.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown if value is null.</exception>
+        </member>
+        <member name="P:SkiaScope.LissajousRenderer.SampleRate">
+            <summary>
+            Gets or sets the sample rate of the audio data.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.LissajousRenderer.#ctor(System.Int32,SkiaScope.ScopeTheme,SkiaScope.ColorMap)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.LissajousRenderer"/> class.
+            </summary>
+            <param name="sampleRate">The sample rate of the audio data.</param>
+            <param name="theme">The theme containing colors and styles for rendering.</param>
+            <param name="colorMap">The color map to use for phosphor persistence visualization.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if theme or colorMap is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if theme is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRenderer.InitializeIntensityBuffer">
+            <summary>
+            Initializes or reinitializes the intensity buffer for phosphor persistence mode.
+            The buffer is sized to match the PointCount for efficient rendering.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.LissajousRenderer.PushSamples(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Pushes audio samples to the renderer.
+            For Lissajous, samples are interpreted as interleaved stereo pairs.
+            Left channel is used for X, right channel is used for Y.
+            </summary>
+            <param name="samples">Audio samples to be rendered (interleaved stereo).</param>
+        </member>
+        <member name="M:SkiaScope.LissajousRenderer.UpdateIntensityBuffer">
+            <summary>
+            Updates the intensity buffer by accumulating new points with exponential decay.
+            Each new point adds intensity to the buffer, and all existing values decay exponentially.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.LissajousRenderer.Render(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders the Lissajous visualization to the provided canvas.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+        </member>
+        <member name="M:SkiaScope.LissajousRenderer.RenderPhosphorMode(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders in phosphor persistence mode using accumulated intensity buffer.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+        </member>
+        <member name="M:SkiaScope.LissajousRenderer.RenderLineMode(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders in traditional line mode with age-based alpha falloff.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+        </member>
+        <member name="T:SkiaScope.LissajousRendererExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.LissajousRenderer"/> to enhance its functionality
+            with common Lissajous curve operations and utilities.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererExtensions.PushSamplePair(SkiaScope.LissajousRenderer,System.Single,System.Single)">
+            <summary>
+            Pushes a single stereo sample pair (left and right channels) to the Lissajous renderer.
+            </summary>
+            <param name="renderer">The Lissajous renderer instance.</param>
+            <param name="leftSample">The left channel sample (-1.0 to 1.0).</param>
+            <param name="rightSample">The right channel sample (-1.0 to 1.0).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <remarks>
+            This is a convenience method for pushing individual sample pairs without creating a span.
+            Useful for real-time processing where samples arrive one pair at a time.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererExtensions.SetPointCount(SkiaScope.LissajousRenderer,System.Int32)">
+            <summary>
+            Sets the number of points to display on the Lissajous curve.
+            </summary>
+            <param name="renderer">The Lissajous renderer instance.</param>
+            <param name="pointCount">The number of points (64 to 8192).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if pointCount is out of valid range.</exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererExtensions.SetLineWidth(SkiaScope.LissajousRenderer,System.Single)">
+            <summary>
+            Sets the line width for drawing the Lissajous curve.
+            </summary>
+            <param name="renderer">The Lissajous renderer instance.</param>
+            <param name="lineWidth">The line width (0.5 to 10.0).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if lineWidth is out of valid range.</exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererExtensions.SetAlphaFalloff(SkiaScope.LissajousRenderer,System.Single)">
+            <summary>
+            Sets the alpha falloff factor for fading old points.
+            </summary>
+            <param name="renderer">The Lissajous renderer instance.</param>
+            <param name="alphaFalloff">The alpha falloff factor (0.9 to 0.999).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if alphaFalloff is out of valid range.</exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererExtensions.SetPhosphorDecay(SkiaScope.LissajousRenderer,System.Single)">
+            <summary>
+            Sets the phosphor decay factor for persistence effect.
+            </summary>
+            <param name="renderer">The Lissajous renderer instance.</param>
+            <param name="phosphorDecay">The phosphor decay factor (0.9 to 0.999).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if phosphorDecay is out of valid range.</exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererExtensions.EnablePhosphorPersistence(SkiaScope.LissajousRenderer)">
+            <summary>
+            Enables phosphor persistence mode for the Lissajous renderer.
+            </summary>
+            <param name="renderer">The Lissajous renderer instance.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererExtensions.DisablePhosphorPersistence(SkiaScope.LissajousRenderer)">
+            <summary>
+            Disables phosphor persistence mode and uses simple line-based rendering.
+            </summary>
+            <param name="renderer">The Lissajous renderer instance.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererExtensions.SetColorMap(SkiaScope.LissajousRenderer,SkiaScope.ColorMap)">
+            <summary>
+            Sets the color map used for phosphor persistence visualization.
+            </summary>
+            <param name="renderer">The Lissajous renderer instance.</param>
+            <param name="colorMap">The color map to use.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> or <paramref name="colorMap"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="T:SkiaScope.LissajousRendererJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extensions for <see cref="T:SkiaScope.LissajousRenderer"/>.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererJsonExtensions.ToJson(SkiaScope.LissajousRenderer,System.Boolean)">
+            <summary>
+            Serializes the <see cref="T:SkiaScope.LissajousRenderer"/> instance to a JSON string.
+            </summary>
+            <param name="value">The Lissajous renderer to serialize.</param>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A JSON string representation of the Lissajous renderer.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string to a <see cref="T:SkiaScope.LissajousRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>The deserialized and validated Lissajous renderer instance.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentException">The deserialized object failed validation.</exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererJsonExtensions.TryFromJson(System.String,SkiaScope.LissajousRenderer@)">
+            <summary>
+            Attempts to deserialize a JSON string to a <see cref="T:SkiaScope.LissajousRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <param name="value">
+            Receives the deserialized and validated Lissajous renderer instance if successful;
+            otherwise, <c>null</c>.
+            </param>
+            <returns><see langword="true"/> if deserialization and validation succeed; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.LissajousRendererJsonExtensions.Clone(SkiaScope.LissajousRenderer)">
+            <summary>
+            Clones a Lissajous renderer by serializing and deserializing it.
+            </summary>
+            <param name="renderer">The Lissajous renderer to clone.</param>
+            <returns>A new Lissajous renderer instance with the same configuration, or <see langword="null"/> if cloning fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.MarkerOverlayRenderer">
+            <summary>
+            Renders labeled vertical and horizontal marker lines on scope visualizations.
+            Markers are defined by position (0..1 normalized), label, and color.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.MarkerOverlayRenderer.Theme">
+            <summary>
+            Gets or sets the theme used for rendering.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown if value is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if value is invalid.</exception>
+        </member>
+        <member name="P:SkiaScope.MarkerOverlayRenderer.SampleRate">
+            <summary>
+            Gets or sets the sample rate of the audio data.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRenderer.#ctor(SkiaScope.Marker[],System.Boolean,SkiaScope.ScopeTheme)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.MarkerOverlayRenderer"/> class.
+            </summary>
+            <param name="markers">Array of markers to render.</param>
+            <param name="horizontal">Whether to render horizontal markers (true) or vertical markers (false).</param>
+            <param name="theme">Optional theme to use for rendering.</param>
+            <exception cref="T:System.ArgumentException">Thrown if theme is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRenderer.PushSamples(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Pushes audio samples to the renderer.
+            This renderer doesn't process audio samples directly, but implements the interface for compatibility.
+            </summary>
+            <param name="samples">Audio samples to be rendered.</param>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRenderer.Render(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders the marker lines to the provided canvas.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+        </member>
+        <member name="T:SkiaScope.Marker">
+            <summary>
+            Represents a marker with position, label, and color.
+            Position is normalized 0..1 where 0 is left/top edge and 1 is right/bottom edge.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.Marker.Position">
+            <summary>
+            Gets the normalized position (0..1) of the marker.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.Marker.Label">
+            <summary>
+            Gets the label text for the marker.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.Marker.Color">
+            <summary>
+            Gets the color of the marker line.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.Marker.#ctor(System.Single,System.String,SkiaScope.Color)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.Marker"/> struct.
+            </summary>
+            <param name="position">Normalized position (0..1).</param>
+            <param name="label">Label text.</param>
+            <param name="color">Marker color.</param>
+        </member>
+        <member name="T:SkiaScope.MarkerOverlayRendererExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.MarkerOverlayRenderer"/> to enhance its functionality
+            with common marker overlay operations and utilities.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRendererExtensions.GetMarkerCount(SkiaScope.MarkerOverlayRenderer)">
+            <summary>
+            Gets the number of markers in the overlay.
+            </summary>
+            <param name="renderer">The marker overlay renderer instance.</param>
+            <returns>The number of markers.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRendererExtensions.GetMarker(SkiaScope.MarkerOverlayRenderer,System.Int32)">
+            <summary>
+            Gets the marker at the specified index.
+            </summary>
+            <param name="renderer">The marker overlay renderer instance.</param>
+            <param name="index">The marker index.</param>
+            <returns>The marker at the specified index, or null if out of range.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if index is out of range.</exception>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRendererExtensions.SetSampleRate(SkiaScope.MarkerOverlayRenderer,System.Int32)">
+            <summary>
+            Sets the sample rate for the marker overlay renderer.
+            </summary>
+            <param name="renderer">The marker overlay renderer instance.</param>
+            <param name="sampleRate">The sample rate.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.MarkerOverlayRendererJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extensions for <see cref="T:SkiaScope.MarkerOverlayRenderer"/>.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRendererJsonExtensions.ToJson(SkiaScope.MarkerOverlayRenderer,System.Boolean)">
+            <summary>
+            Serializes the <see cref="T:SkiaScope.MarkerOverlayRenderer"/> instance to a JSON string.
+            </summary>
+            <param name="value">The marker overlay renderer to serialize.</param>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A JSON string representation of the marker overlay renderer.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRendererJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string to a <see cref="T:SkiaScope.MarkerOverlayRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>The deserialized and validated marker overlay renderer instance.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentException">The deserialized object failed validation.</exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRendererJsonExtensions.TryFromJson(System.String,SkiaScope.MarkerOverlayRenderer@)">
+            <summary>
+            Attempts to deserialize a JSON string to a <see cref="T:SkiaScope.MarkerOverlayRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <param name="value">
+            Receives the deserialized and validated marker overlay renderer instance if successful;
+            otherwise, <c>null</c>.
+            </param>
+            <returns><see langword="true"/> if deserialization and validation succeed; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.MarkerOverlayRendererJsonExtensions.Clone(SkiaScope.MarkerOverlayRenderer)">
+            <summary>
+            Clones a marker overlay renderer by serializing and deserializing it.
+            </summary>
+            <param name="renderer">The marker overlay renderer to clone.</param>
+            <returns>A new marker overlay renderer instance with the same configuration, or <see langword="null"/> if cloning fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.OscilloscopeRenderer">
+            <summary>
+            X-Y oscilloscope renderer that displays left channel on X axis and right channel on Y axis.
+            Lines fade based on the age of points.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.PointCount">
+            <summary>
+            Gets or sets the number of points to display.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.LineWidth">
+            <summary>
+            Gets or sets the line width for drawing.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.AlphaFalloff">
+            <summary>
+            Gets or sets the alpha falloff factor for fading old points (0.0 to 1.0).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.PersistenceAmount">
+            <summary>
+            Gets or sets the persistence amount for drawing previous frames (0.0 to 1.0).
+            When set to 0, persistence is disabled. When set to 1, only the previous frame is visible.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.TriggerStrategy">
+            <summary>
+            Gets or sets the trigger strategy used for waveform alignment.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.EnableEdgeAlignment">
+            <summary>
+            Gets or sets a value indicating whether to enable edge-triggered alignment.
+            When enabled, the waveform is aligned to the first rising edge crossing of the threshold.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.EdgeThreshold">
+            <summary>
+            Gets or sets the threshold level for edge detection (normalized -1.0 to 1.0).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.EdgeHysteresis">
+            <summary>
+            Gets or sets the hysteresis band width for edge detection (normalized -1.0 to 1.0).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.EdgeHoldoffSamples">
+            <summary>
+            Gets or sets the minimum number of samples between edge triggers to prevent repeated triggers.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.Theme">
+            <summary>
+            Gets or sets the theme used for rendering.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown if value is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if value is invalid.</exception>
+        </member>
+        <member name="P:SkiaScope.OscilloscopeRenderer.SampleRate">
+            <summary>
+            Gets or sets the sample rate of the audio data.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.OscilloscopeRenderer.#ctor(SkiaScope.ScopeTheme)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.OscilloscopeRenderer"/> class.
+            </summary>
+            <param name="theme">The theme containing colors and styles for rendering.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if theme is null.</exception>
+        </member>
+        <member name="M:SkiaScope.OscilloscopeRenderer.PushSamples(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Pushes audio samples to the renderer.
+            For oscilloscope, samples are interpreted as interleaved stereo pairs.
+            Left channel is used for X, right channel is for Y.
+            </summary>
+            <param name="samples">Audio samples to be rendered (interleaved stereo).</param>
+        </member>
+        <member name="M:SkiaScope.OscilloscopeRenderer.AlignToTrigger(System.Span{System.Single},System.Span{System.Single})">
+            <summary>
+            Aligns the waveform to the trigger condition if enabled.
+            </summary>
+            <param name="xPoints">The X channel points.</param>
+            <param name="yPoints">The Y channel points.</param>
+            <returns>The number of samples to skip for alignment, or 0 if no alignment.</returns>
+        </member>
+        <member name="M:SkiaScope.OscilloscopeRenderer.Render(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders the oscilloscope visualization to the provided canvas.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if canvas is null.</exception>
+        </member>
+        <member name="T:SkiaScope.OscilloscopeRendererExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.OscilloscopeRenderer"/> to enhance its functionality
+            with common oscilloscope operations and utilities.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.OscilloscopeRendererExtensions.PushSamplePair(SkiaScope.OscilloscopeRenderer,System.Single,System.Single)">
+            <summary>
+            Pushes a single stereo sample pair (left and right channels) to the renderer.
+            </summary>
+            <param name="renderer">The oscilloscope renderer instance.</param>
+            <param name="leftSample">The left channel sample (-1.0 to 1.0).</param>
+            <param name="rightSample">The right channel sample (-1.0 to 1.0).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <remarks>
+            This is a convenience method for pushing individual sample pairs without creating a span.
+            Useful for real-time processing where samples arrive one pair at a time.
+            </remarks>
+        </member>
+        <member name="T:SkiaScope.OscilloscopeRendererJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extensions for <see cref="T:SkiaScope.OscilloscopeRenderer"/>.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.OscilloscopeRendererJsonExtensions.ValidateOscilloscopeRendererNumericValues(SkiaScope.OscilloscopeRenderer)">
+            <summary>
+            Validates numeric ranges in an OscilloscopeRenderer instance to prevent NaN/Infinity or out-of-range values.
+            </summary>
+            <param name="renderer">The renderer to validate.</param>
+            <exception cref="T:System.ArgumentException">Thrown if numeric values are invalid (NaN, Infinity, or out of range).</exception>
+        </member>
+        <member name="M:SkiaScope.OscilloscopeRendererJsonExtensions.ToJson(SkiaScope.OscilloscopeRenderer,System.Boolean)">
+            <summary>
+            Serializes the <see cref="T:SkiaScope.OscilloscopeRenderer"/> instance to a JSON string.
+            </summary>
+            <param name="value">The oscilloscope renderer to serialize.</param>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A JSON string representation of the renderer.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.OscilloscopeRendererJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string to an <see cref="T:SkiaScope.OscilloscopeRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>The deserialized and validated <see cref="T:SkiaScope.OscilloscopeRenderer"/> instance, or <see langword="null"/> if deserialization fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentException">The deserialized object failed validation.</exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.OscilloscopeRendererJsonExtensions.TryFromJson(System.String,SkiaScope.OscilloscopeRenderer@)">
+            <summary>
+            Attempts to deserialize a JSON string to an <see cref="T:SkiaScope.OscilloscopeRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <param name="value">
+            Receives the deserialized and validated <see cref="T:SkiaScope.OscilloscopeRenderer"/> instance if successful; otherwise, <see langword="null"/>.
+            </param>
+            <returns><see langword="true"/> if deserialization and validation succeed; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.RingBuffer">
+            <summary>
+            A ring buffer that stores a sequence of floating-point numbers.
+            </summary>
+        </member>
+        <member name="F:SkiaScope.RingBuffer.MaxCapacity">
+            <summary>
+            The maximum allowed capacity for a <see cref="T:SkiaScope.RingBuffer"/> to prevent memory exhaustion attacks.
+            </summary>
+            <remarks>
+            This value represents a reasonable upper bound that balances memory usage with functionality.
+            A capacity of 2^20 (1,048,576) would require approximately 4MB of memory for a float buffer.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.RingBuffer.#ctor(System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.RingBuffer"/> class.
+            </summary>
+            <param name="capacity">The maximum number of elements the buffer can hold.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            Thrown when <paramref name="capacity"/> is less than 1 or greater than <see cref="F:SkiaScope.RingBuffer.MaxCapacity"/>.
+            </exception>
+        </member>
+        <member name="P:SkiaScope.RingBuffer.Capacity">
+            <summary>
+            Gets the maximum number of elements the buffer can hold.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.RingBuffer.Count">
+            <summary>
+            Gets the number of elements currently stored in the buffer.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.RingBuffer.TotalWritten">
+            <summary>
+            Gets the total number of elements written to the buffer.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.RingBuffer.Write(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Writes a sequence of floating-point numbers to the buffer.
+            </summary>
+            <param name="samples">The sequence of floating-point numbers to write.</param>
+        </member>
+        <member name="M:SkiaScope.RingBuffer.ReadLatest(System.Span{System.Single})">
+            <summary>
+            Reads the latest sequence of floating-point numbers from the buffer.
+            </summary>
+            <param name="destination">The span to store the read sequence in.</param>
+            <returns>The number of elements read.</returns>
+        </member>
+        <member name="M:SkiaScope.RingBuffer.CopyTo(System.Span{System.Single})">
+            <summary>
+            Copies the latest samples from the buffer to the destination span.
+            This is equivalent to ReadLatest but with a more descriptive name for zero-allocation scenarios.
+            </summary>
+            <param name="destination">The span to copy the samples to.</param>
+            <returns>The number of elements copied.</returns>
+        </member>
+        <member name="M:SkiaScope.RingBuffer.TryPeek(System.Span{System.Single})">
+            <summary>
+            Attempts to peek at the latest samples without removing them from the buffer.
+            This is useful for zero-allocation rendering where you want to read the data multiple times.
+            </summary>
+            <param name="destination">The span to peek the samples into.</param>
+            <returns>The number of elements peeked, or 0 if the buffer is empty.</returns>
+        </member>
+        <member name="M:SkiaScope.RingBuffer.Clear">
+            <summary>
+            Clears the buffer, resetting it to its initial state.
+            </summary>
+        </member>
+        <member name="T:SkiaScope.RingBufferExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.RingBuffer"/> to enhance its functionality.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.RingBufferExtensions.Write(SkiaScope.RingBuffer,System.Single)">
+            <summary>
+            Writes a single floating-point value to the buffer.
+            </summary>
+            <param name="buffer">The ring buffer instance.</param>
+            <param name="value">The value to write.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.RingBufferExtensions.ReadAll(SkiaScope.RingBuffer)">
+            <summary>
+            Reads all available elements from the buffer into a new array.
+            </summary>
+            <param name="buffer">The ring buffer instance.</param>
+            <returns>An array containing all elements currently in the buffer.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.RingBufferExtensions.TryWrite(SkiaScope.RingBuffer,System.ReadOnlySpan{System.Single})">
+            <summary>
+            Attempts to write elements to the buffer, returning true if successful.
+            </summary>
+            <param name="buffer">The ring buffer instance.</param>
+            <param name="samples">The sequence of values to write.</param>
+            <returns>True if all elements were written; false if buffer is full.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.RingBufferExtensions.IsEmpty(SkiaScope.RingBuffer)">
+            <summary>
+            Gets a value indicating whether the buffer is empty.
+            </summary>
+            <param name="buffer">The ring buffer instance.</param>
+            <returns>True if the buffer contains no elements; otherwise, false.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.RingBufferExtensions.IsFull(SkiaScope.RingBuffer)">
+            <summary>
+            Gets a value indicating whether the buffer is full.
+            </summary>
+            <param name="buffer">The ring buffer instance.</param>
+            <returns>True if the buffer is full; otherwise, false.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="T:SkiaScope.ScopeRendererExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.IScopeRenderer"/> to enhance functionality
+            with common scope operations and utilities.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.ScopeRendererExtensions.Clear(SkiaScope.IScopeRenderer)">
+            <summary>
+            Clears all buffered samples from the renderer, effectively resetting the display.
+            </summary>
+            <param name="renderer">The scope renderer instance.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <remarks>
+            This method is useful for clearing the display between audio segments or when switching channels.
+            It maintains the current configuration (PointCount, LineWidth, AlphaFalloff, Theme).
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.ScopeRendererExtensions.GetSampleCount(SkiaScope.IScopeRenderer)">
+            <summary>
+            Gets the current number of samples stored in the renderer's buffers.
+            </summary>
+            <param name="renderer">The scope renderer instance.</param>
+            <returns>The number of samples in the renderer's buffers, or 0 if not applicable.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.ScopeRendererExtensions.RenderCenteredSquare(SkiaScope.IScopeRenderer,SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders the scope with a centered square aspect ratio, maintaining the data's proportions.
+            </summary>
+            <param name="renderer">The scope renderer instance.</param>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+            <exception cref="T:System.ArgumentNullException">
+            <paramref name="renderer"/> or <paramref name="canvas"/> is <see langword="null"/>.
+            </exception>
+            <remarks>
+            This method automatically calculates a centered square region within the provided bounds,
+            ensuring the scope trace maintains proper aspect ratio regardless of canvas dimensions.
+            </remarks>
+        </member>
+        <member name="T:SkiaScope.ScopeRendererJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extensions for <see cref="T:SkiaScope.IScopeRenderer"/>.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.ScopeRendererJsonExtensions.ToJson(SkiaScope.IScopeRenderer,System.Boolean)">
+            <summary>
+            Serializes the <see cref="T:SkiaScope.IScopeRenderer"/> instance to a JSON string.
+            </summary>
+            <param name="value">The scope renderer to serialize.</param>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A JSON string representation of the renderer.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.ScopeRendererJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string to an <see cref="T:SkiaScope.IScopeRenderer"/> instance.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>The deserialized <see cref="T:SkiaScope.IScopeRenderer"/> instance, or <see langword="null"/> if deserialization fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.ScopeRendererJsonExtensions.TryFromJson``1(System.String,``0@)">
+            <summary>
+            Attempts to deserialize a JSON string to a specific <see cref="T:SkiaScope.IScopeRenderer"/> type.
+            </summary>
+            <typeparam name="TRenderer">The concrete renderer type to deserialize.</typeparam>
+            <param name="json">The JSON string to deserialize.</param>
+            <param name="value">Receives the deserialized renderer instance if successful; otherwise, <see langword="null"/>.</param>
+            <returns><see langword="true"/> if deserialization succeeds; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.ScopeRendererJsonExtensions.Clone(SkiaScope.IScopeRenderer)">
+            <summary>
+            Clones a scope renderer by serializing and deserializing it.
+            </summary>
+            <param name="renderer">The renderer to clone.</param>
+            <returns>A new instance with the same configuration, or <see langword="null"/> if cloning fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.ScopeRendererJsonExtensions.Clone``1(SkiaScope.IScopeRenderer)">
+            <summary>
+            Clones a scope renderer by serializing and deserializing it to a specific type.
+            </summary>
+            <typeparam name="TRenderer">The concrete renderer type to clone.</typeparam>
+            <param name="renderer">The renderer to clone.</param>
+            <returns>A new instance with the same configuration, or <see langword="null"/> if cloning fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.ScopeSnapshot">
+            <summary>
+            Utility class for saving scope renderer output to PNG files, optionally with a JSON side‑car containing capture metadata.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.ScopeSnapshot.SaveToPng(SkiaScope.IScopeRenderer,System.Int32,System.Int32,System.ReadOnlySpan{System.Single},System.String)">
+            <summary>
+            Renders the scope renderer to a PNG file.
+            </summary>
+            <param name="renderer">The scope renderer to render.</param>
+            <param name="width">The width of the output image in pixels.</param>
+            <param name="height">The height of the output image in pixels.</param>
+            <param name="samples">Audio samples to push to the renderer before saving.</param>
+            <param name="path">The file path where the PNG will be saved.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when <paramref name="renderer"/> is <c>null</c>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when <paramref name="width"/> or <paramref name="height"/> is not positive.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when <paramref name="path"/> is <c>null</c>, empty or whitespace.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when the SKSurface cannot be created.</exception>
+        </member>
+        <member name="M:SkiaScope.ScopeSnapshot.SaveToPngWithMetadata(SkiaScope.IScopeRenderer,System.Int32,System.Int32,System.ReadOnlySpan{System.Single},System.String,SkiaScope.CaptureMetadata)">
+            <summary>
+            Renders the scope renderer to a PNG file and writes a JSON side‑car containing capture metadata.
+            </summary>
+            <param name="renderer">The scope renderer to render.</param>
+            <param name="width">The width of the output image in pixels.</param>
+            <param name="height">The height of the output image in pixels.</param>
+            <param name="samples">Audio samples to push to the renderer before saving.</param>
+            <param name="pngPath">The file path where the PNG will be saved.</param>
+            <param name="metadata">The metadata to serialize alongside the PNG.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when <paramref name="renderer"/> or <paramref name="metadata"/> is <c>null</c>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when <paramref name="width"/> or <paramref name="height"/> is not positive.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when <paramref name="pngPath"/> is <c>null</c>, empty or whitespace.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when the SKSurface cannot be created.</exception>
+        </member>
+        <member name="T:SkiaScope.SpectrogramRenderer">
+            <summary>
+            Renders a spectrogram visualization that maintains a scrolling 2D history of magnitude spectra.
+            The horizontal axis represents time, the vertical axis represents frequency, and color intensity
+            represents magnitude in dB.
+            </summary>
+        </member>
+        <member name="F:SkiaScope.SpectrogramRenderer._spectrogramBitmap">
+            <summary>
+            Persistent bitmap that stores the entire spectrogram history.
+            This bitmap is updated incrementally by shifting existing content and drawing only new columns,
+            avoiding the O(width × height) full redraw operation.
+            </summary>
+        </member>
+        <member name="F:SkiaScope.SpectrogramRenderer._spectrogramCanvas">
+            <summary>
+            Canvas for drawing to the persistent bitmap.
+            </summary>
+        </member>
+        <member name="F:SkiaScope.SpectrogramRenderer._currentColumnIndex">
+            <summary>
+            Current column index where the next column will be drawn.
+            Cycles from 0 to HistoryLength-1 using modulo arithmetic.
+            </summary>
+        </member>
+        <member name="F:SkiaScope.SpectrogramRenderer._bitmapNeedsFullRedraw">
+            <summary>
+            Flag indicating whether the persistent bitmap needs to be fully redrawn.
+            Set to true when theme changes, history length changes, or initialization is needed.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRenderer.HistoryLength">
+            <summary>
+            Gets or sets the number of time columns to maintain in the history.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRenderer.FftSize">
+            <summary>
+            Gets or sets the FFT size used for frequency analysis.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRenderer.MinDb">
+            <summary>
+            Gets or sets the minimum dB value for the color mapping.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRenderer.MaxDb">
+            <summary>
+            Gets or sets the maximum dB value for the color mapping.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRenderer.TimeScale">
+            <summary>
+            Gets or sets the time scaling factor (1.0 = normal speed).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRenderer.AlphaFalloff">
+            <summary>
+            Gets or sets the alpha falloff factor for fading old columns (0.9 to 0.999).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRenderer.Theme">
+            <summary>
+            Gets or sets the theme used for rendering.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown if value is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if value is invalid.</exception>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRenderer.SampleRate">
+            <summary>
+            Gets or sets the sample rate of the audio data.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.#ctor(SkiaScope.ScopeTheme,SkiaScope.ColorMap)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.SpectrogramRenderer"/> class.
+            </summary>
+            <param name="theme">The theme containing colors and styles for rendering.</param>
+            <param name="colorMap">The color map to use for magnitude visualization.</param>
+            <exception cref="T:System.ArgumentException">Thrown if theme is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.ResizeBuffers">
+            <summary>
+            Resizes the internal buffers when HistoryLength or FftSize changes.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.InitializeBitmap">
+            <summary>
+            Initializes the persistent spectrogram bitmap and canvas.
+            Creates a bitmap with dimensions HistoryLength × MagnitudeBins and transparent background.
+            </summary>
+            <remarks>
+            This method is called during construction and whenever HistoryLength or FftSize changes.
+            The bitmap stores the entire spectrogram history in a single contiguous memory block,
+            enabling efficient incremental updates via bitmap shifting.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.InvalidateBitmap">
+            <summary>
+            Invalidates the persistent bitmap, forcing a full redraw on next render.
+            </summary>
+            <remarks>
+            This is called when the theme changes or when the bitmap needs to be recreated
+            due to dimension changes. The next render will fall back to the O(width × height)
+            RenderFullSpectrogram method until the bitmap is reinitialized.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.UpdateBitmapColumn(System.ReadOnlySpan{System.Single})">
+             <summary>
+             Updates a single column in the persistent spectrogram bitmap using bitmap shifting.
+             </summary>
+             <param name="normalizedMagnitudes">Normalized magnitude values [0, 1] for the new column, one per frequency bin.</param>
+             <remarks>
+             This is the core optimization that transforms the renderer from O(width × height) to O(width + height):
+             1. Shifts all existing columns left by one pixel (O(width) pixel copies)
+             2. Draws the new column at the rightmost position (O(height) rectangle draws)
+            
+             The shift operation is cache-friendly as it operates on contiguous pixel memory,
+             and SkiaSharp's DrawBitmap is highly optimized for this operation.
+             </remarks>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.DrawColumnToBitmap(System.Int32,System.ReadOnlySpan{System.Single})">
+            <summary>
+            Draws a single column of magnitudes to the persistent bitmap at the current column position.
+            </summary>
+            <param name="x">The X position (column index) to draw at.</param>
+            <param name="magnitudes">Normalized magnitude values [0, 1] for the column, one per frequency bin.</param>
+            <remarks>
+            This draws only the new column that was added after the bitmap shift operation.
+            The column is drawn as a series of 1-pixel wide rectangles, one per frequency bin.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.PushSamples(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Pushes audio samples to the renderer.
+            Computes the magnitude spectrum and stores it in the history buffer.
+            Updates the persistent spectrogram bitmap using bitmap shifting for optimal performance.
+            </summary>
+            <param name="samples">Audio samples to be rendered.</param>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.Render(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+             <summary>
+             Renders the spectrogram visualization to the provided canvas.
+             </summary>
+             <param name="canvas">The canvas to render to. Must not be null.</param>
+             <param name="bounds">The bounds within which to render. If width or height is less than 1, rendering is skipped.</param>
+             <exception cref="T:System.ArgumentNullException">Thrown if canvas is null.</exception>
+             <remarks>
+             This method uses the optimized rendering path when the persistent bitmap is available:
+             - Draws the pre-rendered bitmap with O(1) complexity
+             - Falls back to RenderFullSpectrogram (O(width × height)) when needed
+            
+             The optimized path is used when:
+             - The persistent bitmap has been initialized
+             - There is sufficient data in the buffers
+             - The bitmap hasn't been invalidated
+             </remarks>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.RenderFullSpectrogram(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+             <summary>
+             Renders the entire spectrogram from scratch using the original O(width × height) algorithm.
+             </summary>
+             <param name="canvas">The canvas to render to.</param>
+             <param name="bounds">The bounds within which to render.</param>
+             <remarks>
+             This is the fallback rendering method used during initialization, after theme changes,
+             or when the persistent bitmap needs to be recreated. It draws all columns from scratch
+             by iterating through the magnitude buffer and drawing each column as a series of rectangles.
+            
+             This method exists for correctness and backward compatibility, not for performance.
+             </remarks>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.ReadColumnAt(System.Int32,System.Span{System.Single})">
+            <summary>
+            Reads a column of magnitudes from the buffer at a specific position.
+            </summary>
+            <param name="columnIndex">The column index to read.</param>
+            <param name="destination">The span to store the magnitudes in.</param>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRenderer.DrawSpectrogramGrid(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Draws a frequency grid over the spectrogram.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to draw.</param>
+        </member>
+        <member name="T:SkiaScope.SpectrogramRendererBenchmark">
+            <summary>
+            Benchmark class to demonstrate the performance improvement of the scrolling spectrogram optimization.
+            Measures frame rendering time for different history lengths to show that frame cost is independent of history width.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererBenchmark.RunBenchmark(System.Int32[],System.Int32)">
+            <summary>
+            Runs a benchmark comparing the optimized bitmap-based rendering with the old full-redraw approach.
+            </summary>
+            <param name="historyLengths">Array of history lengths to test.</param>
+            <param name="iterations">Number of iterations to average results over.</param>
+            <returns>Benchmark results with timing information.</returns>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererBenchmark.GenerateTestSamples(System.Int32)">
+            <summary>
+            Generates test audio samples for benchmarking.
+            </summary>
+        </member>
+        <member name="T:SkiaScope.SpectrogramRendererBenchmark.BenchmarkResults">
+            <summary>
+            Benchmark results containing timing information for different history lengths.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRendererBenchmark.BenchmarkResults.OptimizedTimes">
+            <summary>
+            Gets the average frame times for the optimized renderer, keyed by history length.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRendererBenchmark.BenchmarkResults.MinFrameTime">
+            <summary>
+            Gets the minimum frame time observed.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRendererBenchmark.BenchmarkResults.MaxFrameTime">
+            <summary>
+            Gets the maximum frame time observed.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRendererBenchmark.BenchmarkResults.AverageFrameTime">
+            <summary>
+            Gets the average frame time across all tested history lengths.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.SpectrogramRendererBenchmark.BenchmarkResults.FrameRate">
+            <summary>
+            Gets the frame rate (FPS) that can be sustained based on average frame time.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererBenchmark.BenchmarkResults.ToString">
+            <summary>
+            Formats the benchmark results as a human-readable string.
+            </summary>
+        </member>
+        <member name="T:SkiaScope.SpectrogramRendererExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.SpectrogramRenderer"/> to enhance its functionality
+            with common spectrogram operations and utilities.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererExtensions.SetHistoryLength(SkiaScope.SpectrogramRenderer,System.Int32)">
+            <summary>
+            Sets the history length (number of time columns to maintain) for the spectrogram.
+            </summary>
+            <param name="renderer">The spectrogram renderer instance.</param>
+            <param name="historyLength">The number of time columns (must be positive).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if historyLength is not positive.</exception>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererExtensions.SetFftSize(SkiaScope.SpectrogramRenderer,System.Int32)">
+            <summary>
+            Sets the FFT size used for spectral analysis.
+            </summary>
+            <param name="renderer">The spectrogram renderer instance.</param>
+            <param name="fftSize">The FFT size (must be a power of 2, typically 1024, 2048, 4096).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if fftSize is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererExtensions.SetDbRange(SkiaScope.SpectrogramRenderer,System.Single,System.Single)">
+            <summary>
+            Sets the dB range for the spectrogram display.
+            </summary>
+            <param name="renderer">The spectrogram renderer instance.</param>
+            <param name="minDb">The minimum dB value to display.</param>
+            <param name="maxDb">The maximum dB value to display.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentException">Thrown if minDb is not less than maxDb.</exception>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererExtensions.SetTimeScale(SkiaScope.SpectrogramRenderer,System.Single)">
+            <summary>
+            Sets the time scale factor for horizontal scrolling speed.
+            </summary>
+            <param name="renderer">The spectrogram renderer instance.</param>
+            <param name="timeScale">The time scale factor (1.0 = normal speed).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererExtensions.SetAlphaFalloff(SkiaScope.SpectrogramRenderer,System.Single)">
+            <summary>
+            Sets the alpha falloff factor for fading old spectrogram data.
+            </summary>
+            <param name="renderer">The spectrogram renderer instance.</param>
+            <param name="alphaFalloff">The alpha falloff factor (0.9 to 0.999).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if alphaFalloff is out of valid range.</exception>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererExtensions.SetColorMap(SkiaScope.SpectrogramRenderer,SkiaScope.ColorMap)">
+            <summary>
+            Sets the color map used for spectrogram visualization.
+            </summary>
+            <param name="renderer">The spectrogram renderer instance.</param>
+            <param name="colorMap">The color map to use.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> or <paramref name="colorMap"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.SpectrogramRendererProperties">
+            <summary>
+            Provides properties for SpectrogramRenderer that are not part of IScopeRenderer.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererProperties.HistoryLength(SkiaScope.SpectrogramRenderer)">
+            <summary>
+            Gets the history length (number of time columns to maintain) for the spectrogram.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererProperties.FftSize(SkiaScope.SpectrogramRenderer)">
+            <summary>
+            Gets the FFT size used for spectral analysis.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererProperties.MinDb(SkiaScope.SpectrogramRenderer)">
+            <summary>
+            Gets the minimum dB value for the spectrogram display.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererProperties.MaxDb(SkiaScope.SpectrogramRenderer)">
+            <summary>
+            Gets the maximum dB value for the spectrogram display.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererProperties.TimeScale(SkiaScope.SpectrogramRenderer)">
+            <summary>
+            Gets the time scale factor for horizontal scrolling speed.
+            </summary>
+        </member>
+        <member name="T:SkiaScope.SpectrogramRendererJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extensions for <see cref="T:SkiaScope.SpectrogramRenderer"/>.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererJsonExtensions.ToJson(SkiaScope.SpectrogramRenderer,System.Boolean)">
+            <summary>
+            Serializes the <see cref="T:SkiaScope.SpectrogramRenderer"/> instance to a JSON string.
+            </summary>
+            <param name="value">The spectrogram renderer to serialize.</param>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A JSON string representation of the spectrogram renderer.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string to a <see cref="T:SkiaScope.SpectrogramRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>The deserialized and validated spectrogram renderer instance.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentException">The deserialized object failed validation.</exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererJsonExtensions.TryFromJson(System.String,SkiaScope.SpectrogramRenderer@)">
+            <summary>
+            Attempts to deserialize a JSON string to a <see cref="T:SkiaScope.SpectrogramRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <param name="value">
+            Receives the deserialized and validated spectrogram renderer instance if successful;
+            otherwise, <c>null</c>.
+            </param>
+            <returns><see langword="true"/> if deserialization and validation succeed; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.SpectrogramRendererJsonExtensions.Clone(SkiaScope.SpectrogramRenderer)">
+            <summary>
+            Clones a spectrogram renderer by serializing and deserializing it.
+            </summary>
+            <param name="renderer">The spectrogram renderer to clone.</param>
+            <returns>A new spectrogram renderer instance with the same configuration, or <see langword="null"/> if cloning fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+        <member name="T:SkiaScope.ThemeValidator">
+            <summary>
+            Provides validation for <see cref="T:SkiaScope.ScopeTheme"/> instances.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.ThemeValidator.#ctor(SkiaScope.ScopeTheme)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.ThemeValidator"/> class.
+            </summary>
+            <param name="theme">The theme to validate.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if theme is null.</exception>
+        </member>
+        <member name="M:SkiaScope.ThemeValidator.Validate">
+            <summary>
+            Validates the theme and returns a list of human-readable problems.
+            </summary>
+            <returns>A list of validation problems; empty if valid.</returns>
+        </member>
+        <member name="M:SkiaScope.ThemeValidator.IsValid">
+            <summary>
+            Determines whether the theme is valid.
+            </summary>
+            <returns>True if valid; otherwise, false.</returns>
+        </member>
+        <member name="M:SkiaScope.ThemeValidator.EnsureValid">
+            <summary>
+            Ensures that the theme is valid, throwing an exception if not.
+            </summary>
+            <exception cref="T:System.ArgumentException">Thrown if the theme is invalid.</exception>
+        </member>
+        <member name="T:SkiaScope.VuMeterRenderer">
+            <summary>
+            VU meter renderer that displays audio level as vertical or horizontal bars with peak hold indicators.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.MinDb">
+            <summary>
+            Gets or sets the minimum dB value for the meter.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.HoldPeakFor">
+            <summary>
+            Gets or sets the peak hold time.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.AttackTime">
+            <summary>
+            Gets or sets the attack time constant.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.ReleaseTime">
+            <summary>
+            Gets or sets the release time constant.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.PeakDecayDbPerSecond">
+            <summary>
+            Gets or sets the peak decay rate in dB per second.
+            This controls how fast the peak hold marker decays after the peak has been held.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.Horizontal">
+            <summary>
+            Gets or sets whether the meter is horizontal (true) or vertical (false).
+            </summary>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.UseDecibelScale">
+            <summary>
+            Gets or sets whether to use decibel scale for level mapping.
+            When true, level is mapped via 20*log10 and clamped at -60dB floor.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.ShowDbGridLabels">
+            <summary>
+            Gets or sets whether to show dB grid labels when UseDecibelScale is enabled.
+            </summary>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.Theme">
+            <summary>
+            Gets or sets the theme used for rendering.
+            </summary>
+            <exception cref="T:System.ArgumentNullException">Thrown if value is null.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if value is invalid.</exception>
+        </member>
+        <member name="P:SkiaScope.VuMeterRenderer.SampleRate">
+            <summary>
+            Gets or sets the sample rate of the audio data.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.VuMeterRenderer.#ctor(System.Int32,System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:SkiaScope.VuMeterRenderer"/> class.
+            </summary>
+            <param name="sampleRate">The sample rate of the audio data.</param>
+            <param name="channels">The number of audio channels (default: 2).</param>
+            <exception cref="T:System.ArgumentException">Thrown if the default theme is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRenderer.PushSamples(System.ReadOnlySpan{System.Single})">
+            <summary>
+            Pushes audio samples to the renderer.
+            Samples are expected to be interleaved stereo pairs.
+            </summary>
+            <param name="samples">Audio samples to be rendered (interleaved stereo).</param>
+            <exception cref="T:System.ArgumentNullException">Thrown if samples are empty.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRenderer.ResetClipping">
+            <summary>
+            Resets the clipping indicator for all channels.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.VuMeterRenderer.IsClipping(System.Int32)">
+            <summary>
+            Gets whether a specific channel is clipping.
+            </summary>
+            <param name="channelIndex">The channel index.</param>
+            <returns>True if the channel is clipping.</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if channelIndex is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRenderer.Render(SkiaSharp.SKCanvas,SkiaSharp.SKRect)">
+            <summary>
+            Renders the VU meter visualization to the provided canvas.
+            </summary>
+            <param name="canvas">The canvas to render to.</param>
+            <param name="bounds">The bounds within which to render.</param>
+        </member>
+        <member name="T:SkiaScope.VuMeterRendererExtensions">
+            <summary>
+            Provides extension methods for <see cref="T:SkiaScope.VuMeterRenderer"/> to enhance its functionality
+            with common VU meter operations and utilities.
+            </summary>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.PushSamplePair(SkiaScope.VuMeterRenderer,System.Single,System.Single)">
+            <summary>
+            Pushes a single stereo sample pair (left and right channels) to the VU meter.
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <param name="leftSample">The left channel sample (-1.0 to 1.0).</param>
+            <param name="rightSample">The right channel sample (-1.0 to 1.0).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <remarks>
+            This is a convenience method for pushing individual sample pairs without creating a span.
+            Useful for real-time processing where samples arrive one pair at a time.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.ResetClipping(SkiaScope.VuMeterRenderer)">
+            <summary>
+            Resets the clipping indicators for all channels on the VU meter.
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.IsClipping(SkiaScope.VuMeterRenderer,System.Int32)">
+            <summary>
+            Gets whether a specific channel is clipping.
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <param name="channelIndex">The channel index.</param>
+            <returns>True if the channel is clipping.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if channelIndex is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.SetHorizontal(SkiaScope.VuMeterRenderer,System.Boolean)">
+            <summary>
+            Sets the VU meter to horizontal orientation (bars grow horizontally).
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <param name="horizontal">True for horizontal orientation, false for vertical.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.SetVertical(SkiaScope.VuMeterRenderer)">
+            <summary>
+            Sets the VU meter to vertical orientation (bars grow vertically).
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.EnableDecibelScale(SkiaScope.VuMeterRenderer,System.Boolean)">
+            <summary>
+            Enables decibel scale for level mapping.
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <param name="showLabels">Whether to show dB grid labels.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.DisableDecibelScale(SkiaScope.VuMeterRenderer)">
+            <summary>
+            Disables decibel scale and uses linear level mapping.
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.SetPeakHoldTime(SkiaScope.VuMeterRenderer,System.TimeSpan)">
+            <summary>
+            Sets the peak hold time for the VU meter.
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <param name="holdTime">The time to hold peaks.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.SetBallistics(SkiaScope.VuMeterRenderer,System.TimeSpan,System.TimeSpan)">
+            <summary>
+            Sets the attack and release time constants for the VU meter.
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <param name="attackTime">The attack time constant.</param>
+            <param name="releaseTime">The release time constant.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererExtensions.SetPeakDecay(SkiaScope.VuMeterRenderer,System.Single)">
+            <summary>
+            Sets the peak decay rate in dB per second.
+            </summary>
+            <param name="renderer">The VU meter renderer instance.</param>
+            <param name="decayDbPerSecond">The decay rate in dB/s.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/>.</exception>
+        </member>
+        <member name="T:SkiaScope.VuMeterRendererJsonExtensions">
+            <summary>
+            Provides JSON serialization and deserialization extensions for <see cref="T:SkiaScope.VuMeterRenderer"/>.
+            </summary>
+            <remarks>
+            This class uses the shared <see cref="F:SkiaScope.JsonRendererExtensions.JsonOptions"/> contract
+            for consistent serialization behavior across all renderer types.
+            </remarks>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererJsonExtensions.ToJson(SkiaScope.VuMeterRenderer,System.Boolean)">
+            <summary>
+            Serializes the <see cref="T:SkiaScope.VuMeterRenderer"/> instance to a JSON string.
+            </summary>
+            <param name="value">The VU meter renderer to serialize.</param>
+            <param name="indented">Whether to format the JSON with indentation for readability.</param>
+            <returns>A JSON string representation of the VU meter renderer.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="value"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererJsonExtensions.FromJson(System.String)">
+            <summary>
+            Deserializes a JSON string to a <see cref="T:SkiaScope.VuMeterRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <returns>The deserialized and validated VU meter renderer instance.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+            <exception cref="T:System.ArgumentException">The deserialized object failed validation.</exception>
+            <exception cref="T:System.Text.Json.JsonException">The JSON is invalid.</exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererJsonExtensions.TryFromJson(System.String,SkiaScope.VuMeterRenderer@)">
+            <summary>
+            Attempts to deserialize a JSON string to a <see cref="T:SkiaScope.VuMeterRenderer"/> instance and validates the result.
+            </summary>
+            <param name="json">The JSON string to deserialize.</param>
+            <param name="value">
+            Receives the deserialized and validated VU meter renderer instance if successful;
+            otherwise, <c>null</c>.
+            </param>
+            <returns><see langword="true"/> if deserialization and validation succeed; otherwise, <see langword="false"/>.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+        </member>
+        <member name="M:SkiaScope.VuMeterRendererJsonExtensions.Clone(SkiaScope.VuMeterRenderer)">
+            <summary>
+            Clones a VU meter renderer by serializing and deserializing it.
+            </summary>
+            <param name="renderer">The VU meter renderer to clone.</param>
+            <returns>A new VU meter renderer instance with the same configuration, or <see langword="null"/> if cloning fails.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="renderer"/> is <see langword="null"/></exception>
+        </member>
+    </members>
+</doc>
