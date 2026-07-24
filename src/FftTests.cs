@@ -398,7 +398,8 @@ public static class FftTests
         }
 
         // Test with Rectangular window (no windowing) - should have high leakage
-        var magnitudesRectangular = fft.ComputeMagnitudeSpectrum(samples, WindowFunction.Rectangular);
+        var fftRectangular = new Fft(1024, FftWindow.None);
+var magnitudesRectangular = fftRectangular.ComputeMagnitudeSpectrum(samples);
         float maxMagnitudeRectangular = 0.0f;
         int maxBinRectangular = 0;
         for (int i = 0; i < magnitudesRectangular.Length; i++)
@@ -429,7 +430,8 @@ public static class FftTests
         }
 
         // Test with Hann window - should have reduced leakage
-        var magnitudesHann = fft.ComputeMagnitudeSpectrum(samples, WindowFunction.Hann);
+        var fftHann = new Fft(1024, FftWindow.Hann);
+var magnitudesHann = fftHann.ComputeMagnitudeSpectrum(samples);
         float maxMagnitudeHann = 0.0f;
         int maxBinHann = 0;
         for (int i = 0; i < magnitudesHann.Length; i++)
@@ -458,7 +460,8 @@ public static class FftTests
         }
 
         // Test with Blackman-Harris window - should have even lower leakage
-        var magnitudesBlackmanHarris = fft.ComputeMagnitudeSpectrum(samples, WindowFunction.BlackmanHarris);
+        var fftBlackmanHarris = new Fft(1024, FftWindow.Hamming);
+var magnitudesBlackmanHarris = fftBlackmanHarris.ComputeMagnitudeSpectrum(samples);
         float maxMagnitudeBlackmanHarris = 0.0f;
         int maxBinBlackmanHarris = 0;
         for (int i = 0; i < magnitudesBlackmanHarris.Length; i++)

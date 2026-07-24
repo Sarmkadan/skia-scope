@@ -6,12 +6,12 @@ namespace SkiaScope;
 /// <summary>
 /// Specifies the window function to apply before FFT computation.
 /// </summary>
-public enum WindowFunction
+public enum FftWindow
 {
     /// <summary>
-    /// Rectangular (no windowing) - preserves all signal energy but may have high spectral leakage.
+    /// No windowing (rectangular window) - preserves all signal energy but may have high spectral leakage.
     /// </summary>
-    Rectangular = 0,
+    None = 0,
 
     /// <summary>
     /// Hann window - good general-purpose window with moderate spectral leakage reduction.
@@ -19,9 +19,9 @@ public enum WindowFunction
     Hann = 1,
 
     /// <summary>
-    /// 4-term Blackman-Harris window - excellent spectral leakage reduction for spectrograms.
+    /// Hamming window - similar to Hann but with different coefficients for better side-lobe suppression.
     /// </summary>
-    BlackmanHarris = 2
+    Hamming = 2
 }
 
 /// <summary>
@@ -32,9 +32,10 @@ public sealed class Fft
 {
     private readonly float[] _realBuffer;
     private readonly float[] _imaginaryBuffer;
-    private readonly float[] _windowBuffer;
+    private readonly float[] _windowCoefficients;
     private readonly float[] _twiddleReal;
     private readonly float[] _twiddleImag;
+    private readonly FftWindow _windowType;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Fft"/> class.
@@ -42,9 +43,12 @@ public sealed class Fft
     /// <param name="size">
     /// The number of samples processed per transform. Must be a positive power of two.
     /// </param>
+    /// <param name="window">
+    /// The window function to apply before FFT computation. Defaults to <see cref="FftWindow.Hann"/>.
+    /// </param>
     /// <exception cref="ArgumentException"><paramref name="size"/> is not a positive power of two.</exception>
     [JsonConstructor]
-    public Fft(int size = 1024)
+    public Fft(int size = 1024, FftWindow window = FftWindow.Hann)
     {
         if (size <= 0 || (size & (size - 1)) != 0)
         {
@@ -52,11 +56,15 @@ public sealed class Fft
         }
 
         Size = size;
+        _windowType = window;
 
         // Pre-allocate reusable buffers to avoid allocations per call
         _realBuffer = new float[size];
         _imaginaryBuffer = new float[size];
-        _windowBuffer = new float[size];
+        _windowCoefficients = new float[size];
+
+        // Precompute window coefficients once
+        PrecomputeWindowCoefficients();
 
         // Precompute twiddle factors for all butterfly stages
         _twiddleReal = new float[size];
@@ -76,9 +84,6 @@ public sealed class Fft
     /// The input samples. If shorter than <see cref="Size"/> the remainder is zero-padded;
     /// if longer, only the first <see cref="Size"/> samples are used.
     /// </param>
-    /// <param name="window">
-    /// The window function to apply before transformation. Defaults to <see cref="WindowFunction.Hann"/>
-    /// </param>
     /// <returns>
     /// An array of length <c>Size / 2 + 1</c> containing the magnitude of each
     /// non-negative frequency bin (bin 0 is DC, the last bin is Nyquist).
@@ -86,7 +91,7 @@ public sealed class Fft
     /// <exception cref="ArgumentException">
     /// <paramref name="samples"/> is empty (length 0).
     /// </exception>
-    public float[] ComputeMagnitudeSpectrum(ReadOnlySpan<float> samples, WindowFunction window = WindowFunction.Hann)
+    public float[] ComputeMagnitudeSpectrum(ReadOnlySpan<float> samples)
     {
         if (samples.Length == 0)
         {
@@ -94,7 +99,7 @@ public sealed class Fft
         }
 
         var magnitudes = new float[Size / 2 + 1];
-        ComputeMagnitudeSpectrum(samples, magnitudes, window);
+        ComputeMagnitudeSpectrum(samples, magnitudes);
 
         return magnitudes;
     }
@@ -109,13 +114,10 @@ public sealed class Fft
     /// <param name="magnitudes">
     /// The span to write magnitude results into. Must have length of at least <c>Size / 2 + 1</c>.
     /// </param>
-    /// <param name="window">
-    /// The window function to apply before transformation. Defaults to <see cref="WindowFunction.Hann"/>
-    /// </param>
     /// <exception cref="ArgumentException">
     /// <paramref name="samples"/> is empty (length 0) or <paramref name="magnitudes"/> is too small.
     /// </exception>
-    public void ComputeMagnitudeSpectrum(ReadOnlySpan<float> samples, Span<float> magnitudes, WindowFunction window = WindowFunction.Hann)
+    public void ComputeMagnitudeSpectrum(ReadOnlySpan<float> samples, Span<float> magnitudes)
     {
         if (samples.Length == 0)
         {
@@ -128,7 +130,7 @@ public sealed class Fft
         }
 
         // Apply window function to input samples
-        ApplyWindow(samples, _realBuffer.AsSpan(0, Size), window);
+        ApplyWindow(samples, _realBuffer.AsSpan(0, Size));
 
         // Perform FFT in-place on the real buffer (imaginary starts as zero)
         Transform(_realBuffer, _imaginaryBuffer);
@@ -214,15 +216,14 @@ public sealed class Fft
     }
 
     /// <summary>
-    /// Applies the specified window function to the input samples.
+    /// Applies the window function to the input samples.
     /// </summary>
     /// <param name="input">The input samples to window.</param>
     /// <param name="output">The span to write windowed samples into.</param>
-    /// <param name="window">The window function to apply.</param>
     /// <exception cref="ArgumentException">
     /// <paramref name="input"/> is empty or <paramref name="output"/> is too small.
     /// </exception>
-    private void ApplyWindow(ReadOnlySpan<float> input, Span<float> output, WindowFunction window)
+    private void ApplyWindow(ReadOnlySpan<float> input, Span<float> output)
     {
         if (input.Length == 0)
         {
@@ -236,52 +237,54 @@ public sealed class Fft
 
         int copyCount = Math.Min(input.Length, Size);
 
-        switch (window)
+        // Apply precomputed window coefficients
+        for (int i = 0; i < copyCount; i++)
         {
-            case WindowFunction.Rectangular:
-                // No windowing - rectangular window
-                input[..copyCount].CopyTo(output[..copyCount]);
-                break;
-
-            case WindowFunction.Hann:
-                // Hann window: w(n) = 0.5 * (1 - cos(2πn/(N-1)) for n = 0 to N-1
-                for (int i = 0; i < copyCount; i++)
-                {
-                    float normalizedIndex = i / (float)Math.Max(copyCount - 1, 1);
-                    _windowBuffer[i] = 0.5f - 0.5f * MathF.Cos(2f * MathF.PI * normalizedIndex);
-                    output[i] = input[i] * _windowBuffer[i];
-                }
-                break;
-
-            case WindowFunction.BlackmanHarris:
-                // 4-term Blackman-Harris window:
-                // w(n) = a0 - a1*cos(2πn/(N-1)) + a2*cos(4πn/(N-1)) - a3*cos(6πn/(N-1))
-                // where a0 = 0.35875, a1 = 0.48829, a2 = 0.14128, a3 = 0.01168
-                const float a0 = 0.35875f;
-                const float a1 = 0.48829f;
-                const float a2 = 0.14128f;
-                const float a3 = 0.01168f;
-
-                for (int i = 0; i < copyCount; i++)
-                {
-                    float normalizedIndex = i / (float)Math.Max(copyCount - 1, 1);
-                    float angle = 2f * MathF.PI * normalizedIndex;
-                    _windowBuffer[i] = a0 -
-                                      a1 * MathF.Cos(angle) +
-                                      a2 * MathF.Cos(2f * angle) -
-                                      a3 * MathF.Cos(3f * angle);
-                    output[i] = input[i] * _windowBuffer[i];
-                }
-                break;
-
-            default:
-                throw new ArgumentOutOfRangeException(nameof(window), window, "Unsupported window function");
+            output[i] = input[i] * _windowCoefficients[i];
         }
 
         // Zero-pad the remainder if input is shorter than Size
         if (copyCount < Size)
         {
             output[copyCount..Size].Clear();
+        }
+    }
+
+    /// <summary>
+    /// Precomputes window coefficients for the configured window type.
+    /// </summary>
+    private void PrecomputeWindowCoefficients()
+    {
+        switch (_windowType)
+        {
+            case FftWindow.None:
+                // Rectangular window - all coefficients are 1.0
+                for (int i = 0; i < Size; i++)
+                {
+                    _windowCoefficients[i] = 1.0f;
+                }
+                break;
+
+            case FftWindow.Hann:
+                // Hann window: w(n) = 0.5 * (1 - cos(2πn/(N-1)) for n = 0 to N-1
+                for (int i = 0; i < Size; i++)
+                {
+                    float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
+                    _windowCoefficients[i] = 0.5f - 0.5f * MathF.Cos(2f * MathF.PI * normalizedIndex);
+                }
+                break;
+
+            case FftWindow.Hamming:
+                // Hamming window: w(n) = 0.54 - 0.46 * cos(2πn/(N-1))
+                for (int i = 0; i < Size; i++)
+                {
+                    float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
+                    _windowCoefficients[i] = 0.54f - 0.46f * MathF.Cos(2f * MathF.PI * normalizedIndex);
+                }
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(_windowType), _windowType, "Unsupported window function");
         }
     }
 
@@ -312,22 +315,22 @@ public sealed class Fft
     /// <param name="window">The window function type.</param>
     /// <returns>An array of window coefficients.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// Thrown if <paramref name="window"/> is not a valid <see cref="WindowFunction"/> value.
+    /// Thrown if <paramref name="window"/> is not a valid <see cref="FftWindow"/> value.
     /// </exception>
-    public float[] GetWindowCoefficients(WindowFunction window)
+    public float[] GetWindowCoefficients(FftWindow window)
     {
         var coefficients = new float[Size];
 
         switch (window)
         {
-            case WindowFunction.Rectangular:
+            case FftWindow.None:
                 for (int i = 0; i < Size; i++)
                 {
                     coefficients[i] = 1.0f;
                 }
                 break;
 
-            case WindowFunction.Hann:
+            case FftWindow.Hann:
                 for (int i = 0; i < Size; i++)
                 {
                     float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
@@ -335,20 +338,11 @@ public sealed class Fft
                 }
                 break;
 
-            case WindowFunction.BlackmanHarris:
-                const float a0 = 0.35875f;
-                const float a1 = 0.48829f;
-                const float a2 = 0.14128f;
-                const float a3 = 0.01168f;
-
+            case FftWindow.Hamming:
                 for (int i = 0; i < Size; i++)
                 {
                     float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
-                    float angle = 2f * MathF.PI * normalizedIndex;
-                    coefficients[i] = a0 -
-                                      a1 * MathF.Cos(angle) +
-                                      a2 * MathF.Cos(2f * angle) -
-                                      a3 * MathF.Cos(3f * angle);
+                    coefficients[i] = 0.54f - 0.46f * MathF.Cos(2f * MathF.PI * normalizedIndex);
                 }
                 break;
 
