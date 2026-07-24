@@ -9,6 +9,21 @@ namespace SkiaScope;
 /// </summary>
 public sealed class ColorMap
 {
+    /// <summary>
+    /// Gets the color used to represent NaN (Not a Number) values.
+    /// </summary>
+    public static SKColor NaNSentinelColor { get; } = new SKColor(255, 0, 255, 255); // Bright magenta
+
+    /// <summary>
+    /// Gets the color used to represent positive infinity values.
+    /// </summary>
+    public static SKColor PositiveInfinitySentinelColor { get; } = new SKColor(255, 0, 0, 255); // Bright red
+
+    /// <summary>
+    /// Gets the color used to represent negative infinity values.
+    /// </summary>
+    public static SKColor NegativeInfinitySentinelColor { get; } = new SKColor(0, 0, 255, 255); // Bright blue
+
     private readonly SKColor[] _stops;
     private readonly float[] _positions;
 
@@ -31,14 +46,43 @@ public sealed class ColorMap
     /// <summary>
     /// Maps a value to a color based on the color stops in this color map.
     /// </summary>
-    /// <param name="value">The value to map.</param>
-    /// <returns>The color that corresponds to the value.</returns>
+    /// <remarks>
+    /// Handles special floating-point values:
+    /// <list type="bullet">
+    ///   <item><description>NaN values are mapped to <see cref="NaNSentinelColor"/></description></item>
+    ///   <item><description>Positive infinity is mapped to <see cref="PositiveInfinitySentinelColor"/></description></item>
+    ///   <item><description>Negative infinity is mapped to <see cref="NegativeInfinitySentinelColor"/></description></item>
+    ///   <item><description>Out-of-range values are clamped to [0, 1]</description></item>
+    /// </list>
+    /// </remarks>
+    /// <param name="value">The value to map. Can be any float value including NaN, ±Infinity, or values outside [0, 1].</param>
+    /// <returns>The color that corresponds to the value. Returns a sentinel color for special values.</returns>
     public SKColor Map(float value)
     {
+        // Handle NaN first
+        if (float.IsNaN(value))
+        {
+            return NaNSentinelColor;
+        }
+
+        // Handle infinity values
+        if (float.IsPositiveInfinity(value))
+        {
+            return PositiveInfinitySentinelColor;
+        }
+
+        if (float.IsNegativeInfinity(value))
+        {
+            return NegativeInfinitySentinelColor;
+        }
+
+        // Clamp regular values to [0, 1] range
         value = Math.Clamp(value, 0f, 1f);
 
         if (_stops.Length == 1)
+        {
             return _stops[0];
+        }
 
         for (var i = 0; i < _positions.Length - 1; i++)
         {
