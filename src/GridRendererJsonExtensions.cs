@@ -15,6 +15,40 @@ public static class GridRendererJsonExtensions
     private static readonly JsonSerializerOptions _jsonOptions = JsonRendererExtensions.JsonOptions;
 
     /// <summary>
+    /// Validates numeric ranges in a GridRenderer instance to prevent NaN/Infinity or out-of-range values.
+    /// </summary>
+    /// <param name="renderer">The renderer to validate.</param>
+    /// <exception cref="ArgumentException">Thrown if numeric values are invalid (NaN, Infinity, or out of range).</exception>
+    private static void ValidateGridRendererNumericValues(GridRenderer renderer)
+    {
+        // Validate sample rate
+        if (float.IsNaN(renderer.SampleRate) || float.IsInfinity(renderer.SampleRate))
+        {
+            throw new ArgumentException(
+                $"SampleRate contains invalid numeric value: {renderer.SampleRate}. NaN and Infinity are not allowed.",
+                nameof(renderer));
+        }
+
+        // Validate theme numeric values
+        if (renderer.Theme != null)
+        {
+            if (float.IsNaN(renderer.Theme.GridThickness) || float.IsInfinity(renderer.Theme.GridThickness))
+            {
+                throw new ArgumentException(
+                    $"Theme.GridThickness contains invalid numeric value: {renderer.Theme.GridThickness}",
+                    nameof(renderer));
+            }
+
+            if (float.IsNaN(renderer.Theme.FontSize) || float.IsInfinity(renderer.Theme.FontSize))
+            {
+                throw new ArgumentException(
+                    $"Theme.FontSize contains invalid numeric value: {renderer.Theme.FontSize}",
+                    nameof(renderer));
+            }
+        }
+    }
+
+    /// <summary>
     /// Serializes a <see cref="GridRenderer"/> instance to a JSON string.
     /// </summary>
     /// <param name="value">The <see cref="GridRenderer"/> instance to serialize.</param>
@@ -45,6 +79,13 @@ public static class GridRendererJsonExtensions
         ArgumentNullException.ThrowIfNull(json);
 
         var result = JsonSerializer.Deserialize<GridRenderer>(json, _jsonOptions);
+
+        if (result != null)
+        {
+            // Validate numeric ranges and detect NaN/Infinity
+            ValidateGridRendererNumericValues(result);
+        }
+
         JsonRendererExtensions.Validate(result);
         return result;
     }
@@ -66,6 +107,13 @@ public static class GridRendererJsonExtensions
         try
         {
             value = JsonSerializer.Deserialize<GridRenderer>(json, _jsonOptions);
+
+            if (value != null)
+            {
+                // Validate numeric ranges and detect NaN/Infinity
+                ValidateGridRendererNumericValues(value);
+            }
+
             JsonRendererExtensions.Validate(value);
             return true;
         }
@@ -74,7 +122,7 @@ public static class GridRendererJsonExtensions
             value = null;
             return false;
         }
-        catch (Exception)
+        catch (ArgumentException)
         {
             value = null;
             return false;

@@ -15,6 +15,17 @@ public static class FftJsonExtensions
     private static readonly JsonSerializerOptions _jsonOptions = JsonRendererExtensions.JsonOptions;
 
     /// <summary>
+    /// Validates numeric ranges in an Fft instance to prevent NaN/Infinity or out-of-range values.
+    /// </summary>
+    /// <param name="fft">The FFT instance to validate.</param>
+    /// <exception cref="ArgumentException">Thrown if numeric values are invalid (NaN, Infinity, or out of range).</exception>
+    private static void ValidateFftNumericValues(Fft fft)
+    {
+        // Size is already validated in FromJson/TryFromJson
+        // No other numeric properties to validate in Fft class
+    }
+
+    /// <summary>
     /// Serializes the <see cref="Fft"/> instance to JSON.
     /// </summary>
     /// <param name="value">The <see cref="Fft"/> instance to serialize.</param>
@@ -37,15 +48,38 @@ public static class FftJsonExtensions
     /// </summary>
     /// <param name="json">The JSON string.</param>
     /// <returns>The deserialized and validated <see cref="Fft"/> instance, or <c>null</c> if the JSON is empty.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException">The deserialized object failed validation.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
+    /// <exception cref="ArgumentException">
+    /// The deserialized object failed validation or the Size parameter is out of valid range.
+    /// </exception>
     /// <exception cref="JsonException">The JSON is invalid.</exception>
     public static Fft? FromJson(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
 
         var result = JsonSerializer.Deserialize<Fft>(json, _jsonOptions);
-        JsonRendererExtensions.Validate(result);
+
+        if (result != null)
+        {
+            const int MaxFftSize = 1 << 20; // 1 MB worth of float samples (1M samples * 4 bytes)
+            if (result.Size <= 0 || result.Size > MaxFftSize)
+            {
+                throw new ArgumentException(
+                    $"FFT size must be a positive power of two between 1 and {MaxFftSize}. Actual: {result.Size}",
+                    nameof(result));
+            }
+
+            // Validate that Size is actually a power of two
+            if ((result.Size & (result.Size - 1)) != 0)
+            {
+                throw new ArgumentException(
+                    $"FFT size must be a power of two. Actual: {result.Size}",
+                    nameof(result));
+            }
+
+            JsonRendererExtensions.Validate(result);
+        }
+
         return result;
     }
 
@@ -58,7 +92,7 @@ public static class FftJsonExtensions
     /// if the operation succeeded; otherwise, <c>null</c>.
     /// </param>
     /// <returns><see langword="true"/> if deserialization and validation succeeded; otherwise, <see langword="false"/>.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="json"/> is <see langword="null"/></exception>
     public static bool TryFromJson(string json, out Fft? value)
     {
         ArgumentNullException.ThrowIfNull(json);
@@ -66,7 +100,26 @@ public static class FftJsonExtensions
         try
         {
             value = JsonSerializer.Deserialize<Fft>(json, _jsonOptions);
-            JsonRendererExtensions.Validate(value);
+
+            if (value != null)
+            {
+                const int MaxFftSize = 1 << 20; // 1 MB worth of float samples (1M samples * 4 bytes)
+                if (value.Size <= 0 || value.Size > MaxFftSize)
+                {
+                    value = null;
+                    return false;
+                }
+
+                // Validate that Size is actually a power of two
+                if ((value.Size & (value.Size - 1)) != 0)
+                {
+                    value = null;
+                    return false;
+                }
+
+                JsonRendererExtensions.Validate(value);
+            }
+
             return true;
         }
         catch (JsonException)
@@ -74,7 +127,7 @@ public static class FftJsonExtensions
             value = null;
             return false;
         }
-        catch (Exception)
+        catch (ArgumentException)
         {
             value = null;
             return false;
