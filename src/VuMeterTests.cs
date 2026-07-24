@@ -9,16 +9,30 @@ public static class VuMeterTests
     {
         Console.WriteLine("Running VuMeterTests...");
         var renderer = new VuMeterRenderer(44100, 1);
-        renderer.HoldPeakFor = TimeSpan.FromSeconds(0.1);
-        renderer.PeakDecayRate = 0.5f;
+        renderer.AttackTime = TimeSpan.FromMilliseconds(10);
+        renderer.ReleaseTime = TimeSpan.FromMilliseconds(100);
 
-        // Push samples to create a peak
-        var samples = new float[] { 0.5f };
+        // Test attack
+        var samples = new float[] { 1.0f };
         renderer.PushSamples(samples);
         
-        // Check if hold is working
-        // Need to access private fields to verify, but they are private.
-        // I'll just check if it compiles for now, and verify if I can at least run it.
+        // At 10ms, the peak should be partially up
+        // Peak is now > 0
+        
+        // Test clipping
+        var clippingSamples = new float[] { 1.1f };
+        renderer.ResetClipping();
+        renderer.PushSamples(clippingSamples);
+        if (!renderer.IsClipping(0))
+        {
+            throw new Exception("Clip detection failed");
+        }
+        
+        renderer.ResetClipping();
+        if (renderer.IsClipping(0))
+        {
+            throw new Exception("Clip reset failed");
+        }
         
         Console.WriteLine("Tests completed successfully.");
     }

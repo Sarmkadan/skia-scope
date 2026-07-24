@@ -15,16 +15,17 @@ public sealed class VuMeterRenderer : IScopeRenderer
     private readonly int _channels;
     private float _minDb = -60;
     private TimeSpan _holdPeakFor = TimeSpan.FromSeconds(1);
-    private float _peakDecayRate = 0.01f;
-private float _peakDecayDbPerSecond = 30.0f;
+    private TimeSpan _attackTime = TimeSpan.FromMilliseconds(10);
+    private TimeSpan _releaseTime = TimeSpan.FromMilliseconds(300);
+    private float _peakDecayDbPerSecond = 30.0f;
     private bool _horizontal = false;
     private float[] _channelRms = Array.Empty<float>();
     private float[] _channelPeak = Array.Empty<float>();
     private float[] _channelPeakHold = Array.Empty<float>();
     private float[] _channelPeakHoldTimer = Array.Empty<float>();
-    private float _decayCoefficient = 0.01f;
-private bool _useDecibelScale = false;
-private bool _showDbGridLabels = true;
+    private bool[] _channelClipping = Array.Empty<bool>();
+    private bool _useDecibelScale = false;
+    private bool _showDbGridLabels = true;
 
     /// <summary>
     /// Gets or sets the minimum dB value for the meter.
@@ -45,23 +46,32 @@ private bool _showDbGridLabels = true;
     }
 
     /// <summary>
-    /// Gets or sets the peak decay rate.
+    /// Gets or sets the attack time constant.
     /// </summary>
-    public float PeakDecayRate
+    public TimeSpan AttackTime
     {
-        get => _peakDecayRate;
-        set => _peakDecayRate = Math.Clamp(value, 0, 1);
+        get => _attackTime;
+        set => _attackTime = value > TimeSpan.Zero ? value : TimeSpan.FromMilliseconds(1);
     }
 
-/// <summary>
-/// Gets or sets the peak decay rate in dB per second.
-/// This controls how fast the peak hold marker decays after the peak has been held.
-/// </summary>
-public float PeakDecayDbPerSecond
-{
-    get => _peakDecayDbPerSecond;
-    set => _peakDecayDbPerSecond = Math.Clamp(value, 0.1f, 1000.0f);
-}
+    /// <summary>
+    /// Gets or sets the release time constant.
+    /// </summary>
+    public TimeSpan ReleaseTime
+    {
+        get => _releaseTime;
+        set => _releaseTime = value > TimeSpan.Zero ? value : TimeSpan.FromMilliseconds(10);
+    }
+
+    /// <summary>
+    /// Gets or sets the peak decay rate in dB per second.
+    /// This controls how fast the peak hold marker decays after the peak has been held.
+    /// </summary>
+    public float PeakDecayDbPerSecond
+    {
+        get => _peakDecayDbPerSecond;
+        set => _peakDecayDbPerSecond = Math.Clamp(value, 0.1f, 1000.0f);
+    }
 
     /// <summary>
     /// Gets or sets whether the meter is horizontal (true) or vertical (false).
@@ -72,24 +82,24 @@ public float PeakDecayDbPerSecond
         set => _horizontal = value;
     }
 
-/// <summary>
-/// Gets or sets whether to use decibel scale for level mapping.
-/// When true, level is mapped via 20*log10 and clamped at -60dB floor.
-/// </summary>
-public bool UseDecibelScale
-{
-	get => _useDecibelScale;
-	set => _useDecibelScale = value;
-}
+    /// <summary>
+    /// Gets or sets whether to use decibel scale for level mapping.
+    /// When true, level is mapped via 20*log10 and clamped at -60dB floor.
+    /// </summary>
+    public bool UseDecibelScale
+    {
+        get => _useDecibelScale;
+        set => _useDecibelScale = value;
+    }
 
-/// <summary>
-/// Gets or sets whether to show dB grid labels when UseDecibelScale is enabled.
-/// </summary>
-public bool ShowDbGridLabels
-{
-	get => _showDbGridLabels;
-	set => _showDbGridLabels = value;
-}
+    /// <summary>
+    /// Gets or sets whether to show dB grid labels when UseDecibelScale is enabled.
+    /// </summary>
+    public bool ShowDbGridLabels
+    {
+        get => _showDbGridLabels;
+        set => _showDbGridLabels = value;
+    }
 
     /// <summary>
     /// Gets or sets the theme used for rendering.
@@ -136,6 +146,7 @@ public bool ShowDbGridLabels
         _channelPeak = new float[_channels];
         _channelPeakHold = new float[_channels];
         _channelPeakHoldTimer = new float[_channels];
+        _channelClipping = new bool[_channels];
     }
 
     /// <summary>
@@ -143,6 +154,7 @@ public bool ShowDbGridLabels
     /// Samples are expected to be interleaved stereo pairs.
     /// </summary>
     /// <param name="samples">Audio samples to be rendered (interleaved stereo).</param>
+    /// <exception cref="ArgumentNullException">Thrown if samples are empty.</exception>
     public void PushSamples(ReadOnlySpan<float> samples)
     {
         if (samples.Length == 0)
@@ -166,7 +178,14 @@ public bool ShowDbGridLabels
             // Extract channel samples
             for (int i = 0; i < samplesPerChannel; i++)
             {
-                channelSamples[i] = samples[i * _channels + ch];
+                float sample = samples[i * _channels + ch];
+                channelSamples[i] = sample;
+                
+                // Clip detection - latched
+                if (Math.Abs(sample) >= 1.0f)
+                {
+                    _channelClipping[ch] = true;
+                }
             }
 
             // Calculate RMS for this channel
@@ -188,13 +207,14 @@ public bool ShowDbGridLabels
                 _channelPeakHoldTimer[ch] += 1.0f / _sampleRate;
                 if (_channelPeakHoldTimer[ch] >= _holdPeakFor.TotalSeconds)
                 {
-                        // Decay the peak hold using dB/s rate
-                        float decayAmountDb = _peakDecayDbPerSecond * (1.0f / _sampleRate);
-                        float decayMultiplier = MathF.Pow(10.0f, -decayAmountDb / 20.0f);
-                        _channelPeakHold[ch] *= decayMultiplier;
-                        if (_channelPeakHold[ch] < _channelPeak[ch])
-                        {
-                            _channelPeakHold[ch] = _channelPeak[ch];
+                    // Decay the peak hold using dB/s rate
+                    float decayAmountDb = _peakDecayDbPerSecond * (1.0f / _sampleRate);
+                    float decayMultiplier = MathF.Pow(10.0f, -decayAmountDb / 20.0f);
+                    _channelPeakHold[ch] *= decayMultiplier;
+                    if (_channelPeakHold[ch] < _channelPeak[ch])
+                    {
+                        _channelPeakHold[ch] = _channelPeak[ch];
+                    }
                 }
             }
         }
@@ -202,7 +222,29 @@ public bool ShowDbGridLabels
         // Store RMS and peak values in ring buffers for visualization
         _rmsBuffer.Write(_channelRms);
         _peakBuffer.Write(_channelPeak);
-                        }
+    }
+
+    /// <summary>
+    /// Resets the clipping indicator for all channels.
+    /// </summary>
+    public void ResetClipping()
+    {
+        Array.Fill(_channelClipping, false);
+    }
+
+    /// <summary>
+    /// Gets whether a specific channel is clipping.
+    /// </summary>
+    /// <param name="channelIndex">The channel index.</param>
+    /// <returns>True if the channel is clipping.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if channelIndex is invalid.</exception>
+    public bool IsClipping(int channelIndex)
+    {
+        if (channelIndex < 0 || channelIndex >= _channels)
+        {
+            throw new ArgumentOutOfRangeException(nameof(channelIndex));
+        }
+        return _channelClipping[channelIndex];
     }
 
     private static float CalculateRms(ReadOnlySpan<float> samples)
@@ -240,16 +282,19 @@ public bool ShowDbGridLabels
             }
         }
 
-        // Apply ballistics: fast attack, slow decay
+        // Apply ballistics: attack and release time constants
+        float attackCoefficient = 1.0f - MathF.Exp(-1.0f / (_sampleRate * (float)_attackTime.TotalSeconds));
+        float releaseCoefficient = 1.0f - MathF.Exp(-1.0f / (_sampleRate * (float)_releaseTime.TotalSeconds));
+
         if (maxSample > currentPeak)
         {
-            // Attack phase - fast rise
-            return maxSample;
+            // Attack phase
+            return currentPeak + attackCoefficient * (maxSample - currentPeak);
         }
         else
         {
-            // Decay phase - slow fall
-            return currentPeak * (1 - _decayCoefficient);
+            // Release phase
+            return currentPeak + releaseCoefficient * (maxSample - currentPeak);
         }
     }
 
