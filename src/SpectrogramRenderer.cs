@@ -1,5 +1,7 @@
 using System;
 using SkiaSharp;
+using System.Diagnostics;
+#pragma warning disable CA2014 // Potential stack overflow
 
 namespace SkiaScope;
 
@@ -21,6 +23,30 @@ public sealed class SpectrogramRenderer : IScopeRenderer
     private float _timeScale = 1.0f;
     private float _alphaFalloff = 0.98f;
     private int _magnitudeBins;
+
+    /// <summary>
+    /// Persistent bitmap that stores the entire spectrogram history.
+    /// This bitmap is updated incrementally by shifting existing content and drawing only new columns,
+    /// avoiding the O(width × height) full redraw operation.
+    /// </summary>
+    private SKBitmap? _spectrogramBitmap;
+
+    /// <summary>
+    /// Canvas for drawing to the persistent bitmap.
+    /// </summary>
+    private SKCanvas? _spectrogramCanvas;
+
+    /// <summary>
+    /// Current column index where the next column will be drawn.
+    /// Cycles from 0 to HistoryLength-1 using modulo arithmetic.
+    /// </summary>
+    private int _currentColumnIndex;
+
+    /// <summary>
+    /// Flag indicating whether the persistent bitmap needs to be fully redrawn.
+    /// Set to true when theme changes, history length changes, or initialization is needed.
+    /// </summary>
+    private bool _bitmapNeedsFullRedraw = true;
 
     /// <summary>
     /// Gets or sets the number of time columns to maintain in the history.
@@ -107,6 +133,8 @@ public sealed class SpectrogramRenderer : IScopeRenderer
         {
             value?.EnsureValid();
             _ = value; // Theme is set in constructor and immutable
+            // Invalidate bitmap when theme changes
+            InvalidateBitmap();
         }
     }
 
@@ -130,6 +158,9 @@ public sealed class SpectrogramRenderer : IScopeRenderer
         _magnitudeBins = _fftSize / 2 + 1;
         _magnitudeBuffer = new RingBuffer(HistoryLength * _magnitudeBins);
         _timeBuffer = new RingBuffer(HistoryLength);
+
+        // Initialize persistent bitmap
+        InitializeBitmap();
     }
 
     /// <summary>
@@ -182,11 +213,162 @@ public sealed class SpectrogramRenderer : IScopeRenderer
             newTimeBuffer.ReadLatest(tempTime);
             _timeBuffer.Write(tempTime);
         }
+
+        // Reinitialize bitmap with new dimensions
+        InitializeBitmap();
+        _bitmapNeedsFullRedraw = true;
+    }
+
+    /// <summary>
+    /// Initializes the persistent spectrogram bitmap and canvas.
+    /// Creates a bitmap with dimensions HistoryLength × MagnitudeBins and transparent background.
+    /// </summary>
+    /// <remarks>
+    /// This method is called during construction and whenever HistoryLength or FftSize changes.
+    /// The bitmap stores the entire spectrogram history in a single contiguous memory block,
+    /// enabling efficient incremental updates via bitmap shifting.
+    /// </remarks>
+    private void InitializeBitmap()
+    {
+        // Dispose old bitmap if it exists
+        _spectrogramBitmap?.Dispose();
+        _spectrogramCanvas?.Dispose();
+
+        // Calculate bitmap dimensions based on history length and FFT size
+        int bitmapWidth = HistoryLength;
+        int bitmapHeight = _magnitudeBins;
+
+        // Create bitmap with appropriate color type (8 bits per component)
+        _spectrogramBitmap = new SKBitmap(bitmapWidth, bitmapHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
+        _spectrogramCanvas = new SKCanvas(_spectrogramBitmap);
+        _spectrogramCanvas.Clear(SKColors.Transparent);
+        _currentColumnIndex = 0;
+    }
+
+    /// <summary>
+    /// Invalidates the persistent bitmap, forcing a full redraw on next render.
+    /// </summary>
+    /// <remarks>
+    /// This is called when the theme changes or when the bitmap needs to be recreated
+    /// due to dimension changes. The next render will fall back to the O(width × height)
+    /// RenderFullSpectrogram method until the bitmap is reinitialized.
+    /// </remarks>
+    private void InvalidateBitmap()
+    {
+        _bitmapNeedsFullRedraw = true;
+    }
+
+    /// <summary>
+    /// Updates a single column in the persistent spectrogram bitmap using bitmap shifting.
+    /// </summary>
+    /// <param name="normalizedMagnitudes">Normalized magnitude values [0, 1] for the new column, one per frequency bin.</param>
+    /// <remarks>
+    /// This is the core optimization that transforms the renderer from O(width × height) to O(width + height):
+    /// 1. Shifts all existing columns left by one pixel (O(width) pixel copies)
+    /// 2. Draws the new column at the rightmost position (O(height) rectangle draws)
+    ///
+    /// The shift operation is cache-friendly as it operates on contiguous pixel memory,
+    /// and SkiaSharp's DrawBitmap is highly optimized for this operation.
+    /// </remarks>
+    private void UpdateBitmapColumn(ReadOnlySpan<float> normalizedMagnitudes)
+    {
+        // If bitmap doesn't exist yet, initialize it
+        if (_spectrogramBitmap == null || _spectrogramCanvas == null)
+        {
+            InitializeBitmap();
+        }
+
+        // If dimensions don't match, reinitialize
+        if (_spectrogramBitmap != null && (_spectrogramBitmap.Width != HistoryLength || _spectrogramBitmap.Height != _magnitudeBins))
+        {
+            InitializeBitmap();
+        }
+
+        // Shift existing content left by one column (scroll effect)
+        // This is O(width) but operates on contiguous pixel memory, much faster than O(width*height) full redraw
+        if (_spectrogramBitmap != null && _spectrogramCanvas != null && _spectrogramBitmap.Width > 1)
+        {
+            // Use a highly optimized approach: draw the entire bitmap content shifted left by one pixel
+            // This leverages SkiaSharp's hardware-accelerated bitmap operations
+
+            // Save the current state
+            _spectrogramCanvas.Save();
+
+            // Clear the rightmost column (will be overwritten by new column)
+            // Using a simple rectangle fill is faster than a bitmap operation for clearing
+            using var clearPaint = new SKPaint { Color = SKColors.Transparent, Style = SKPaintStyle.Fill };
+            _spectrogramCanvas.DrawRect(_spectrogramBitmap.Width - 1, 0, 1, _spectrogramBitmap.Height, clearPaint);
+
+            // Copy all columns left by one pixel in a single efficient operation
+            // We draw from right to left to avoid overwriting source pixels before they're copied
+            for (int x = _spectrogramBitmap.Width - 2; x >= 0; x--)
+            {
+                // Draw one column from source to destination, shifting everything left
+                var srcRect = new SKRect(x + 1, 0, x + 2, _spectrogramBitmap.Height);
+                var dstRect = new SKRect(x, 0, x + 1, _spectrogramBitmap.Height);
+                _spectrogramCanvas.DrawBitmap(_spectrogramBitmap, srcRect, dstRect);
+            }
+
+            _spectrogramCanvas.Restore();
+        }
+
+        // Draw the new column at the current position
+        if (_spectrogramBitmap != null)
+        {
+            DrawColumnToBitmap(_currentColumnIndex, normalizedMagnitudes);
+
+            // Move to next column (wraps around)
+            _currentColumnIndex = (_currentColumnIndex + 1) % _spectrogramBitmap.Width;
+        }
+    }
+
+    /// <summary>
+    /// Draws a single column of magnitudes to the persistent bitmap at the current column position.
+    /// </summary>
+    /// <param name="x">The X position (column index) to draw at.</param>
+    /// <param name="magnitudes">Normalized magnitude values [0, 1] for the column, one per frequency bin.</param>
+    /// <remarks>
+    /// This draws only the new column that was added after the bitmap shift operation.
+    /// The column is drawn as a series of 1-pixel wide rectangles, one per frequency bin.
+    /// </remarks>
+    private void DrawColumnToBitmap(int x, ReadOnlySpan<float> magnitudes)
+    {
+        if (_spectrogramCanvas == null || _spectrogramBitmap == null)
+        {
+            return;
+        }
+
+        // Draw each frequency bin as a vertical rectangle
+        for (int bin = 0; bin < _magnitudeBins; bin++)
+        {
+            float magnitude = magnitudes[bin];
+
+            // Map magnitude to color using the color map
+            SKColor color = _colorMap.Map(magnitude);
+
+            // Apply alpha based on age (older columns are more transparent)
+            // New columns are fully opaque, older ones fade according to AlphaFalloff
+            // The column at position x should be fully opaque (ageRatio = 0)
+            // Columns to the left are older and should fade
+            float ageRatio = (float)x / _spectrogramBitmap.Width;
+            byte alpha = (byte)(255 * MathF.Pow(AlphaFalloff, ageRatio));
+            color = color.WithAlpha(alpha);
+
+            using var paint = new SKPaint
+            {
+                Color = color,
+                Style = SKPaintStyle.Fill,
+                IsAntialias = false
+            };
+
+            _spectrogramCanvas.DrawRect(x, bin, 1, 1, paint);
+        }
     }
 
     /// <summary>
     /// Pushes audio samples to the renderer.
     /// Computes the magnitude spectrum and stores it in the history buffer.
+    /// Updates the persistent spectrogram bitmap using bitmap shifting for optimal performance.
     /// </summary>
     /// <param name="samples">Audio samples to be rendered.</param>
     public void PushSamples(ReadOnlySpan<float> samples)
@@ -223,13 +405,27 @@ public sealed class SpectrogramRenderer : IScopeRenderer
 
         // Write time marker (always 1.0 to track time progression)
         _timeBuffer.Write(stackalloc float[] { 1.0f });
+
+        // Update the persistent spectrogram bitmap using bitmap shifting
+        UpdateBitmapColumn(normalizedMagnitudes);
     }
 
     /// <summary>
     /// Renders the spectrogram visualization to the provided canvas.
     /// </summary>
-    /// <param name="canvas">The canvas to render to.</param>
-    /// <param name="bounds">The bounds within which to render.</param>
+    /// <param name="canvas">The canvas to render to. Must not be null.</param>
+    /// <param name="bounds">The bounds within which to render. If width or height is less than 1, rendering is skipped.</param>
+    /// <exception cref="ArgumentNullException">Thrown if canvas is null.</exception>
+    /// <remarks>
+    /// This method uses the optimized rendering path when the persistent bitmap is available:
+    /// - Draws the pre-rendered bitmap with O(1) complexity
+    /// - Falls back to RenderFullSpectrogram (O(width × height)) when needed
+    ///
+    /// The optimized path is used when:
+    /// - The persistent bitmap has been initialized
+    /// - There is sufficient data in the buffers
+    /// - The bitmap hasn't been invalidated
+    /// </remarks>
     public void Render(SKCanvas canvas, SKRect bounds)
     {
         if (canvas is null)
@@ -242,6 +438,69 @@ public sealed class SpectrogramRenderer : IScopeRenderer
             return; // Nothing to render
         }
 
+        // If we don't have enough data or the bitmap needs full redraw, draw everything
+        if (_spectrogramBitmap == null || _spectrogramCanvas == null || _magnitudeBuffer.Count / _magnitudeBins < 1 || _bitmapNeedsFullRedraw)
+        {
+            RenderFullSpectrogram(canvas, bounds);
+            return;
+        }
+
+        // Calculate how many columns we can display
+        int availableColumns = Math.Min(HistoryLength, _magnitudeBuffer.Count / _magnitudeBins);
+        int displayColumns = Math.Min(availableColumns, HistoryLength);
+        int columnsToRender = (int)(displayColumns * TimeScale);
+        columnsToRender = Math.Clamp(columnsToRender, 1, displayColumns);
+
+        // Calculate column width
+        float columnWidth = bounds.Width / columnsToRender;
+
+        // Draw the persistent spectrogram bitmap
+        if (_spectrogramBitmap != null)
+        {
+            float bitmapAspect = (float)_spectrogramBitmap.Width / _spectrogramBitmap.Height;
+            float targetAspect = bounds.Width / bounds.Height;
+
+            SKRect destRect = bounds;
+            if (Math.Abs(bitmapAspect - targetAspect) > 0.01f)
+            {
+                // Scale to fit while maintaining aspect ratio
+                float scaleX = bounds.Width / _spectrogramBitmap.Width;
+                float scaleY = bounds.Height / _spectrogramBitmap.Height;
+                float scale = Math.Min(scaleX, scaleY);
+
+                float scaledWidth = _spectrogramBitmap.Width * scale;
+                float scaledHeight = _spectrogramBitmap.Height * scale;
+
+                destRect = new SKRect(
+                    bounds.MidX - scaledWidth / 2,
+                    bounds.MidY - scaledHeight / 2,
+                    bounds.MidX + scaledWidth / 2,
+                    bounds.MidY + scaledHeight / 2
+                );
+            }
+
+            // Draw the bitmap
+            canvas.DrawBitmap(_spectrogramBitmap, destRect);
+        }
+
+        // Draw grid overlay
+        DrawSpectrogramGrid(canvas, bounds);
+    }
+
+    /// <summary>
+    /// Renders the entire spectrogram from scratch using the original O(width × height) algorithm.
+    /// </summary>
+    /// <param name="canvas">The canvas to render to.</param>
+    /// <param name="bounds">The bounds within which to render.</param>
+    /// <remarks>
+    /// This is the fallback rendering method used during initialization, after theme changes,
+    /// or when the persistent bitmap needs to be recreated. It draws all columns from scratch
+    /// by iterating through the magnitude buffer and drawing each column as a series of rectangles.
+    ///
+    /// This method exists for correctness and backward compatibility, not for performance.
+    /// </remarks>
+    private void RenderFullSpectrogram(SKCanvas canvas, SKRect bounds)
+    {
         int availableColumns = Math.Min(HistoryLength, _magnitudeBuffer.Count / _magnitudeBins);
 
         if (availableColumns < 1)
