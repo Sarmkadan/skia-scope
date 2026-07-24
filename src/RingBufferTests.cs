@@ -8,6 +8,7 @@ public static class RingBufferTests
   {
     Console.WriteLine("Running RingBufferTests...");
 
+    TestCapacityValidation();
     TestBasicWriteRead();
     TestWraparound();
     TestCountSemantics();
@@ -20,6 +21,94 @@ public static class RingBufferTests
 
     Console.WriteLine("All RingBufferTests passed successfully.");
   }
+
+private static void TestCapacityValidation()
+{
+    Console.WriteLine(" Testing capacity validation...");
+
+    // Test zero capacity - should throw
+    try
+    {
+        var buffer = new RingBuffer(0);
+        throw new Exception("Expected ArgumentOutOfRangeException for capacity = 0");
+    }
+    catch (ArgumentOutOfRangeException ex) when (ex.Message.Contains("positive integer"))
+    {
+        Console.WriteLine(" ✓ Zero capacity throws ArgumentOutOfRangeException");
+    }
+
+    // Test negative capacity - should throw
+    try
+    {
+        var buffer = new RingBuffer(-1);
+        throw new Exception("Expected ArgumentOutOfRangeException for negative capacity");
+    }
+    catch (ArgumentOutOfRangeException ex) when (ex.Message.Contains("positive integer"))
+    {
+        Console.WriteLine(" ✓ Negative capacity throws ArgumentOutOfRangeException");
+    }
+
+    // Test capacity = 1 (minimum valid capacity)
+    try
+    {
+        var buffer = new RingBuffer(1);
+        if (buffer.Capacity != 1)
+            throw new Exception("Capacity mismatch for capacity = 1");
+        Console.WriteLine(" ✓ Capacity = 1 works correctly");
+    }
+    catch (Exception ex)
+    {
+        throw new Exception($"Capacity = 1 failed: {ex.Message}");
+    }
+
+    // Test capacity at MaxCapacity boundary
+    try
+    {
+        var buffer = new RingBuffer(RingBuffer.MaxCapacity);
+        if (buffer.Capacity != RingBuffer.MaxCapacity)
+            throw new Exception("Capacity mismatch for MaxCapacity");
+        Console.WriteLine(" ✓ Capacity = MaxCapacity works correctly");
+    }
+    catch (Exception ex)
+    {
+        throw new Exception($"Capacity = MaxCapacity failed: {ex.Message}");
+    }
+
+    // Test capacity exceeding MaxCapacity - should throw
+    try
+    {
+        var buffer = new RingBuffer(RingBuffer.MaxCapacity + 1);
+        throw new Exception("Expected ArgumentOutOfRangeException for capacity > MaxCapacity");
+    }
+    catch (ArgumentOutOfRangeException ex) when (ex.Message.Contains("memory exhaustion"))
+    {
+        Console.WriteLine(" ✓ Capacity > MaxCapacity throws ArgumentOutOfRangeException");
+    }
+
+    // Test int.MaxValue - should throw
+    try
+    {
+        var buffer = new RingBuffer(int.MaxValue);
+        throw new Exception("Expected ArgumentOutOfRangeException for capacity = int.MaxValue");
+    }
+    catch (ArgumentOutOfRangeException ex) when (ex.Message.Contains("memory exhaustion"))
+    {
+        Console.WriteLine(" ✓ Capacity = int.MaxValue throws ArgumentOutOfRangeException");
+    }
+
+    // Test a reasonable capacity that should work
+    try
+    {
+        var buffer = new RingBuffer(1024);
+        if (buffer.Capacity != 1024)
+            throw new Exception("Capacity mismatch for capacity = 1024");
+        Console.WriteLine(" ✓ Reasonable capacity (1024) works correctly");
+    }
+    catch (Exception ex)
+    {
+        throw new Exception($"Capacity = 1024 failed: {ex.Message}");
+    }
+}
 
   private static void TestBasicWriteRead()
   {
