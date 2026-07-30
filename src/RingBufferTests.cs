@@ -18,6 +18,8 @@ public static class RingBufferTests
     TestEmptyBufferRead();
     TestCopyTo();
     TestTryPeek();
+    TestCopyLatest();
+    TestTryPeekLast();
 
     Console.WriteLine("All RingBufferTests passed successfully.");
   }
@@ -375,5 +377,36 @@ private static void TestCapacityValidation()
       throw new Exception($"Expected 0 samples from empty buffer TryPeek, got {emptyPeekCount}");
 
     Console.WriteLine(" ✓ TryPeek works correctly");
+  }
+
+  private static void TestCopyLatest()
+  {
+      Console.WriteLine(" Testing CopyLatest extension method...");
+      var buffer = new RingBuffer(10);
+      buffer.Write(new float[] { 1.0f, 2.0f, 3.0f });
+
+      var dest = new float[3];
+      int count = buffer.CopyLatest(dest);
+
+      if (count != 3) throw new Exception($"Expected 3, got {count}");
+      if (dest[0] != 1.0f || dest[1] != 2.0f || dest[2] != 3.0f) throw new Exception("Data mismatch in CopyLatest");
+
+      Console.WriteLine(" ✓ CopyLatest works correctly");
+  }
+
+  private static void TestTryPeekLast()
+  {
+      Console.WriteLine(" Testing TryPeekLast extension method...");
+      var buffer = new RingBuffer(10);
+
+      // Empty
+      if (buffer.TryPeekLast(out _)) throw new Exception("TryPeekLast should return false for empty buffer");
+
+      // With data
+      buffer.Write(new float[] { 1.0f, 2.0f, 3.0f });
+      if (!buffer.TryPeekLast(out float value)) throw new Exception("TryPeekLast should return true for non-empty buffer");
+      if (value != 3.0f) throw new Exception($"Expected 3.0, got {value}");
+
+      Console.WriteLine(" ✓ TryPeekLast works correctly");
   }
 }
