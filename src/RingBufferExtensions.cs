@@ -91,4 +91,40 @@ public static class RingBufferExtensions
         ArgumentNullException.ThrowIfNull(buffer);
         return buffer.Count == buffer.Capacity;
     }
+
+    /// <summary>
+    /// Copies the newest N samples in chronological order from the buffer to the destination span.
+    /// </summary>
+    /// <param name="buffer">The ring buffer instance.</param>
+    /// <param name="destination">The span to copy the samples to.</param>
+    /// <returns>The number of elements copied.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
+    public static int CopyLatest(this RingBuffer buffer, Span<float> destination)
+    {
+        ArgumentNullException.ThrowIfNull(buffer);
+        return buffer.ReadLatest(destination);
+    }
+
+    /// <summary>
+    /// Attempts to peek at the last element written to the buffer.
+    /// </summary>
+    /// <param name="buffer">The ring buffer instance.</param>
+    /// <param name="value">The last element, if available.</param>
+    /// <returns>True if an element was peeked; false if the buffer is empty.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="buffer"/> is <see langword="null"/>.</exception>
+    public static bool TryPeekLast(this RingBuffer buffer, out float value)
+    {
+        ArgumentNullException.ThrowIfNull(buffer);
+
+        if (buffer.IsEmpty())
+        {
+            value = 0;
+            return false;
+        }
+
+        Span<float> span = stackalloc float[1];
+        buffer.TryPeek(span);
+        value = span[0];
+        return true;
+    }
 }
