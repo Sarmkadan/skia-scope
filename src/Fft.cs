@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Text.Json.Serialization;
 
 namespace SkiaScope;
@@ -19,14 +20,14 @@ public enum FftWindow
     Hann = 1,
 
     /// <summary>
-    /// Hamming window - similar to Hann but with different coefficients for better side-lobe suppression.
+    /// Hamming window - similar to Hann but with different coefficients for better side‑lobe suppression.
     /// </summary>
     Hamming = 2
 }
 
 /// <summary>
-/// Computes the frequency spectrum of real-valued audio buffers using an
-/// iterative radix-2 Cooley-Tukey Fast Fourier Transform.
+/// Computes the frequency spectrum of real‑valued audio buffers using an
+/// iterative radix‑2 Cooley‑Tukey Fast Fourier Transform.
 /// </summary>
 public sealed class Fft
 {
@@ -58,15 +59,15 @@ public sealed class Fft
         Size = size;
         _windowType = window;
 
-        // Pre-allocate reusable buffers to avoid allocations per call
+        // Pre‑allocate reusable buffers to avoid allocations per call
         _realBuffer = new float[size];
         _imaginaryBuffer = new float[size];
         _windowCoefficients = new float[size];
 
-        // Precompute window coefficients once
+        // Pre‑compute window coefficients once
         PrecomputeWindowCoefficients();
 
-        // Precompute twiddle factors for all butterfly stages
+        // Pre‑compute twiddle factors for all butterfly stages
         _twiddleReal = new float[size];
         _twiddleImag = new float[size];
         PrecomputeTwiddleFactors();
@@ -81,12 +82,12 @@ public sealed class Fft
     /// Computes the magnitude spectrum for the given audio samples.
     /// </summary>
     /// <param name="samples">
-    /// The input samples. If shorter than <see cref="Size"/> the remainder is zero-padded;
+    /// The input samples. If shorter than <see cref="Size"/> the remainder is zero‑padded;
     /// if longer, only the first <see cref="Size"/> samples are used.
     /// </param>
     /// <returns>
     /// An array of length <c>Size / 2 + 1</c> containing the magnitude of each
-    /// non-negative frequency bin (bin 0 is DC, the last bin is Nyquist).
+    /// non‑negative frequency bin (bin 0 is DC, the last bin is Nyquist).
     /// </returns>
     /// <exception cref="ArgumentException">
     /// <paramref name="samples"/> is empty (length 0).
@@ -98,17 +99,30 @@ public sealed class Fft
             throw new ArgumentException("Input samples cannot be empty", nameof(samples));
         }
 
-        var magnitudes = new float[Size / 2 + 1];
-        ComputeMagnitudeSpectrum(samples, magnitudes);
+        // Rent a buffer from the shared pool to avoid a per‑call allocation.
+        var rented = ArrayPool<float>.Shared.Rent(Size / 2 + 1);
+        try
+        {
+            var resultSpan = rented.AsSpan(0, Size / 2 + 1);
+            ComputeMagnitudeSpectrum(samples, resultSpan);
 
-        return magnitudes;
+            // Return a correctly sized array to the caller.
+            var result = new float[Size / 2 + 1];
+            resultSpan.CopyTo(result);
+            return result;
+        }
+        finally
+        {
+            // Return the rented buffer; the caller has its own copy.
+            ArrayPool<float>.Shared.Return(rented);
+        }
     }
 
     /// <summary>
     /// Computes the magnitude spectrum and writes results into the provided output span.
     /// </summary>
     /// <param name="samples">
-    /// The input samples. If shorter than <see cref="Size"/> the remainder is zero-padded;
+    /// The input samples. If shorter than <see cref="Size"/> the remainder is zero‑padded;
     /// if longer, only the first <see cref="Size"/> samples are used.
     /// </param>
     /// <param name="magnitudes">
@@ -132,7 +146,7 @@ public sealed class Fft
         // Apply window function to input samples
         ApplyWindow(samples, _realBuffer.AsSpan(0, Size));
 
-        // Perform FFT in-place on the real buffer (imaginary starts as zero)
+        // Perform FFT in‑place on the real buffer (imaginary starts as zero)
         Transform(_realBuffer, _imaginaryBuffer);
 
         // Compute magnitudes
@@ -143,7 +157,7 @@ public sealed class Fft
     }
 
     /// <summary>
-    /// Performs an in-place iterative radix-2 Cooley-Tukey FFT on the given real and
+    /// Performs an in‑place iterative radix‑2 Cooley‑Tukey FFT on the given real and
     /// imaginary components.
     /// </summary>
     /// <param name="real">The real components; overwritten with the transform's real part.</param>
@@ -165,7 +179,7 @@ public sealed class Fft
 
         int n = Size;
 
-        // Bit-reversal permutation.
+        // Bit‑reversal permutation.
         for (int i = 1, j = 0; i < n; i++)
         {
             int bit = n >> 1;
@@ -183,7 +197,7 @@ public sealed class Fft
             }
         }
 
-        // Iterative Cooley-Tukey butterfly using precomputed twiddle factors.
+        // Iterative Cooley‑Tukey butterfly using pre‑computed twiddle factors.
         for (int len = 2; len <= n; len <<= 1)
         {
             int twiddleStep = n / len;
@@ -198,7 +212,7 @@ public sealed class Fft
                     float evenReal = real[evenIdx];
                     float evenImag = imaginary[evenIdx];
 
-                    // Use precomputed twiddle factors
+                    // Use pre‑computed twiddle factors
                     int twiddleIndex = k * twiddleStep;
                     float wReal = _twiddleReal[twiddleIndex];
                     float wImag = _twiddleImag[twiddleIndex];
@@ -237,13 +251,13 @@ public sealed class Fft
 
         int copyCount = Math.Min(input.Length, Size);
 
-        // Apply precomputed window coefficients
+        // Apply pre‑computed window coefficients
         for (int i = 0; i < copyCount; i++)
         {
             output[i] = input[i] * _windowCoefficients[i];
         }
 
-        // Zero-pad the remainder if input is shorter than Size
+        // Zero‑pad the remainder if input is shorter than Size
         if (copyCount < Size)
         {
             output[copyCount..Size].Clear();
@@ -251,14 +265,14 @@ public sealed class Fft
     }
 
     /// <summary>
-    /// Precomputes window coefficients for the configured window type.
+    /// Pre‑computes window coefficients for the configured window type.
     /// </summary>
     private void PrecomputeWindowCoefficients()
     {
         switch (_windowType)
         {
             case FftWindow.None:
-                // Rectangular window - all coefficients are 1.0
+                // Rectangular window – all coefficients are 1.0
                 for (int i = 0; i < Size; i++)
                 {
                     _windowCoefficients[i] = 1.0f;
@@ -266,7 +280,7 @@ public sealed class Fft
                 break;
 
             case FftWindow.Hann:
-                // Hann window: w(n) = 0.5 * (1 - cos(2πn/(N-1)) for n = 0 to N-1
+                // Hann window: w(n) = 0.5 · (1 - cos(2πn/(N‑1))) for n = 0 … N‑1
                 for (int i = 0; i < Size; i++)
                 {
                     float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
@@ -275,7 +289,7 @@ public sealed class Fft
                 break;
 
             case FftWindow.Hamming:
-                // Hamming window: w(n) = 0.54 - 0.46 * cos(2πn/(N-1))
+                // Hamming window: w(n) = 0.54 - 0.46 · cos(2πn/(N‑1))
                 for (int i = 0; i < Size; i++)
                 {
                     float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
@@ -289,7 +303,7 @@ public sealed class Fft
     }
 
     /// <summary>
-    /// Precomputes twiddle factors for all butterfly stages.
+    /// Pre‑computes twiddle factors for all butterfly stages.
     /// </summary>
     private void PrecomputeTwiddleFactors()
     {
@@ -319,37 +333,50 @@ public sealed class Fft
     /// </exception>
     public float[] GetWindowCoefficients(FftWindow window)
     {
-        var coefficients = new float[Size];
-
-        switch (window)
+        // Rent a buffer to avoid allocating a new array on every call.
+        var rented = ArrayPool<float>.Shared.Rent(Size);
+        try
         {
-            case FftWindow.None:
-                for (int i = 0; i < Size; i++)
-                {
-                    coefficients[i] = 1.0f;
-                }
-                break;
+            var coefficients = rented.AsSpan(0, Size);
 
-            case FftWindow.Hann:
-                for (int i = 0; i < Size; i++)
-                {
-                    float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
-                    coefficients[i] = 0.5f - 0.5f * MathF.Cos(2f * MathF.PI * normalizedIndex);
-                }
-                break;
+            switch (window)
+            {
+                case FftWindow.None:
+                    for (int i = 0; i < Size; i++)
+                    {
+                        coefficients[i] = 1.0f;
+                    }
+                    break;
 
-            case FftWindow.Hamming:
-                for (int i = 0; i < Size; i++)
-                {
-                    float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
-                    coefficients[i] = 0.54f - 0.46f * MathF.Cos(2f * MathF.PI * normalizedIndex);
-                }
-                break;
+                case FftWindow.Hann:
+                    for (int i = 0; i < Size; i++)
+                    {
+                        float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
+                        coefficients[i] = 0.5f - 0.5f * MathF.Cos(2f * MathF.PI * normalizedIndex);
+                    }
+                    break;
 
-            default:
-                throw new ArgumentOutOfRangeException(nameof(window), window, "Unsupported window function");
+                case FftWindow.Hamming:
+                    for (int i = 0; i < Size; i++)
+                    {
+                        float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
+                        coefficients[i] = 0.54f - 0.46f * MathF.Cos(2f * MathF.PI * normalizedIndex);
+                    }
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(window), window, "Unsupported window function");
+            }
+
+            // Return a correctly sized array to the caller.
+            var result = new float[Size];
+            coefficients.CopyTo(result);
+            return result;
         }
-
-        return coefficients;
+        finally
+        {
+            // Return the rented buffer to the pool.
+            ArrayPool<float>.Shared.Return(rented);
+        }
     }
 }
