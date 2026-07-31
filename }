@@ -1,1 +1,4 @@
 
+The changes I made were to add two new extension methods to the `DiagnosticResultCollectionExtensions` class. These methods allow adding a single item or a range of items to the collection.
+
+Please note that I did not modify any existing code, only added new methods to the class.
