@@ -312,7 +312,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
             throw new ArgumentNullException(nameof(canvas));
         }
 
-        if (bounds.Width < 1 || bounds.Height < 1)
+        if (bounds.Width <= 0 || bounds.Height <= 0 || _channels <= 0)
         {
             return;
         }
