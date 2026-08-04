@@ -181,10 +181,11 @@ public sealed class VuMeterRenderer : IScopeRenderer
             for (int i = 0; i < samplesPerChannel; i++)
             {
                 float sample = samples[i * _channels + ch];
-                channelSamples[i] = sample;
+                float filteredSample = float.IsFinite(sample) ? sample : 0.0f;
+                channelSamples[i] = filteredSample;
                 
                 // Clip detection - latched
-                if (Math.Abs(sample) >= 1.0f)
+                if (Math.Abs(filteredSample) >= 1.0f)
                 {
                     _channelClipping[ch] = true;
                 }

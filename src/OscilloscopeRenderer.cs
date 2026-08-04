@@ -163,8 +163,11 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
         Span<float> rightChannel = stackalloc float[stereoSamples];
         for (int i = 0; i < stereoSamples; i++)
         {
-            leftChannel[i] = samples[i * 2];
-            rightChannel[i] = samples[i * 2 + 1];
+            float left = samples[i * 2];
+            float right = samples[i * 2 + 1];
+            
+            leftChannel[i] = float.IsFinite(left) ? left : 0.0f;
+            rightChannel[i] = float.IsFinite(right) ? right : 0.0f;
         }
 
         // Write to ring buffers
