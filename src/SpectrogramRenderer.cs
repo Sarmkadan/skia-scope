@@ -1,6 +1,7 @@
 using System;
-using SkiaSharp;
 using System.Diagnostics;
+using System.Globalization;
+using SkiaSharp;
 #pragma warning disable CA2014 // Potential stack overflow
 
 namespace SkiaScope;
@@ -18,6 +19,7 @@ public sealed class SpectrogramRenderer : IScopeRenderer
     private readonly RingBuffer _timeBuffer;
     private int _historyLength = 512;
     private int _fftSize = 1024;
+    private FftWindow _fftWindow = FftWindow.Hann;
     private float _minDb = -90f;
     private float _maxDb = 0f;
     private float _timeScale = 1.0f;
@@ -49,6 +51,12 @@ public sealed class SpectrogramRenderer : IScopeRenderer
     private bool _bitmapNeedsFullRedraw = true;
 
     /// <summary>
+    /// Occurs when the renderer emits a lightweight diagnostic message. Messages use
+    /// invariant-culture, key-value formatting and are produced only while subscribed.
+    /// </summary>
+    public event Action<string>? DiagnosticMessage;
+
+    /// <summary>
     /// Gets or sets the number of time columns to maintain in the history.
     /// </summary>
     public int HistoryLength
@@ -78,9 +86,44 @@ public sealed class SpectrogramRenderer : IScopeRenderer
             }
             if (value != _fftSize)
             {
+                int oldFftSize = _fftSize;
                 _fftSize = value;
                 _magnitudeBins = _fftSize / 2 + 1;
+                Action<string>? diagnosticMessage = DiagnosticMessage;
+                if (diagnosticMessage != null)
+                {
+                    diagnosticMessage(string.Format(CultureInfo.InvariantCulture,
+                        "event=fft_resize old={0} new={1}", oldFftSize, _fftSize));
+                }
                 ResizeBuffers();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the window function applied before each FFT computation.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if value is not a defined window function.</exception>
+    public FftWindow FftWindow
+    {
+        get => _fftWindow;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported window function");
+            }
+
+            if (value != _fftWindow)
+            {
+                FftWindow oldWindow = _fftWindow;
+                _fftWindow = value;
+                Action<string>? diagnosticMessage = DiagnosticMessage;
+                if (diagnosticMessage != null)
+                {
+                    diagnosticMessage(string.Format(CultureInfo.InvariantCulture,
+                        "event=fft_window_change old={0} new={1}", oldWindow, _fftWindow));
+                }
             }
         }
     }
@@ -150,7 +193,25 @@ public sealed class SpectrogramRenderer : IScopeRenderer
     /// <param name="colorMap">The color map to use for magnitude visualization.</param>
     /// <exception cref="ArgumentException">Thrown if theme is invalid.</exception>
     public SpectrogramRenderer(ScopeTheme theme, ColorMap colorMap)
+        : this(theme, colorMap, null)
     {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SpectrogramRenderer"/> class with an optional
+    /// callback that can receive diagnostics emitted during construction.
+    /// </summary>
+    /// <param name="theme">The theme containing colors and styles for rendering.</param>
+    /// <param name="colorMap">The color map to use for magnitude visualization.</param>
+    /// <param name="diagnosticMessage">An optional callback for lightweight diagnostic messages.</param>
+    /// <exception cref="ArgumentException">Thrown if theme is invalid.</exception>
+    public SpectrogramRenderer(ScopeTheme theme, ColorMap colorMap, Action<string>? diagnosticMessage)
+    {
+        if (diagnosticMessage != null)
+        {
+            DiagnosticMessage += diagnosticMessage;
+        }
+
         _theme = theme ?? throw new ArgumentNullException(nameof(theme));
         _theme.EnsureValid();
         _colorMap = colorMap ?? throw new ArgumentNullException(nameof(colorMap));
@@ -161,6 +222,14 @@ public sealed class SpectrogramRenderer : IScopeRenderer
 
         // Initialize persistent bitmap
         InitializeBitmap();
+
+        Action<string>? handler = DiagnosticMessage;
+        if (handler != null)
+        {
+            handler(string.Format(CultureInfo.InvariantCulture,
+                "event=renderer_constructed fft_size={0} fft_window={1} history_length={2} magnitude_bins={3} sample_rate={4}",
+                _fftSize, _fftWindow, _historyLength, _magnitudeBins, SampleRate));
+        }
     }
 
     /// <summary>
@@ -168,9 +237,19 @@ public sealed class SpectrogramRenderer : IScopeRenderer
     /// </summary>
     private void ResizeBuffers()
     {
+        int oldMagnitudeCapacity = _magnitudeBuffer.Capacity;
+        int oldTimeCapacity = _timeBuffer.Capacity;
         int newMagnitudeBins = _fftSize / 2 + 1;
         var newMagnitudeBuffer = new RingBuffer(HistoryLength * newMagnitudeBins);
         var newTimeBuffer = new RingBuffer(HistoryLength);
+
+        Action<string>? diagnosticMessage = DiagnosticMessage;
+        if (diagnosticMessage != null)
+        {
+            diagnosticMessage(string.Format(CultureInfo.InvariantCulture,
+                "event=buffer_resize old_magnitude_capacity={0} new_magnitude_capacity={1} old_time_capacity={2} new_time_capacity={3}",
+                oldMagnitudeCapacity, newMagnitudeBuffer.Capacity, oldTimeCapacity, newTimeBuffer.Capacity));
+        }
 
         // Copy old data if possible
         int oldMagnitudeCount = Math.Min(_magnitudeBuffer.Count / _magnitudeBins, newMagnitudeBuffer.Capacity / newMagnitudeBins);
@@ -375,11 +454,16 @@ public sealed class SpectrogramRenderer : IScopeRenderer
     {
         if (samples.Length == 0)
         {
+            Action<string>? diagnosticMessage = DiagnosticMessage;
+            if (diagnosticMessage != null)
+            {
+                diagnosticMessage("event=samples_dropped reason=empty sample_count=0");
+            }
             return;
         }
 
         // Compute magnitude spectrum using FFT
-        var fft = new Fft(FftSize);
+        var fft = new Fft(FftSize, FftWindow);
         float[] magnitudes = fft.ComputeMagnitudeSpectrum(samples);
 
         // Convert to dB scale
@@ -435,6 +519,12 @@ public sealed class SpectrogramRenderer : IScopeRenderer
 
         if (bounds.Width < 1 || bounds.Height < 1)
         {
+            Action<string>? diagnosticMessage = DiagnosticMessage;
+            if (diagnosticMessage != null)
+            {
+                diagnosticMessage(string.Format(CultureInfo.InvariantCulture,
+                    "event=render_dropped reason=invalid_bounds width={0} height={1}", bounds.Width, bounds.Height));
+            }
             return; // Nothing to render
         }
 
@@ -505,6 +595,13 @@ public sealed class SpectrogramRenderer : IScopeRenderer
 
         if (availableColumns < 1)
         {
+            Action<string>? diagnosticMessage = DiagnosticMessage;
+            if (diagnosticMessage != null)
+            {
+                diagnosticMessage(string.Format(CultureInfo.InvariantCulture,
+                    "event=render_insufficient_samples available_columns={0} required_columns=1 buffered_samples={1}",
+                    availableColumns, _magnitudeBuffer.Count));
+            }
             return; // Need at least one column to render
         }
 
