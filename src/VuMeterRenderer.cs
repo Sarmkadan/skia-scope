@@ -8,16 +8,124 @@ namespace SkiaScope;
 /// </summary>
 public sealed class VuMeterRenderer : IScopeRenderer
 {
+    /// <summary>The default minimum decibel level displayed by the meter.</summary>
+    private const float DefaultMinDb = -60.0f;
+
+    /// <summary>The lowest permitted minimum decibel level.</summary>
+    private const float MinDbLowerBound = -120.0f;
+
+    /// <summary>The highest permitted minimum decibel level.</summary>
+    private const float MinDbUpperBound = 0.0f;
+
+    /// <summary>The default rate at which held peaks decay, in decibels per second.</summary>
+    private const float DefaultPeakDecayDbPerSecond = 30.0f;
+
+    /// <summary>The minimum permitted peak decay rate, in decibels per second.</summary>
+    private const float MinimumPeakDecayDbPerSecond = 0.1f;
+
+    /// <summary>The maximum permitted peak decay rate, in decibels per second.</summary>
+    private const float MaximumPeakDecayDbPerSecond = 1000.0f;
+
+    /// <summary>The default duration for which a peak is held.</summary>
+    private static readonly TimeSpan DefaultPeakHoldDuration = TimeSpan.FromSeconds(1.0);
+
+    /// <summary>The fallback peak hold duration used when a non-positive value is supplied.</summary>
+    private static readonly TimeSpan MinimumPeakHoldDuration = TimeSpan.FromSeconds(0.1);
+
+    /// <summary>The default attack time constant.</summary>
+    private static readonly TimeSpan DefaultAttackTime = TimeSpan.FromMilliseconds(10.0);
+
+    /// <summary>The fallback attack time used when a non-positive value is supplied.</summary>
+    private static readonly TimeSpan MinimumAttackTime = TimeSpan.FromMilliseconds(1.0);
+
+    /// <summary>The default release time constant.</summary>
+    private static readonly TimeSpan DefaultReleaseTime = TimeSpan.FromMilliseconds(300.0);
+
+    /// <summary>The fallback release time used when a non-positive value is supplied.</summary>
+    private static readonly TimeSpan MinimumReleaseTime = TimeSpan.FromMilliseconds(10.0);
+
+    /// <summary>The maximum linear sample magnitude before clipping is indicated.</summary>
+    private const float ClippingThreshold = 1.0f;
+
+    /// <summary>The spacing between grid labels and the meter bounds, in pixels.</summary>
+    private const float GridLabelOffset = 4.0f;
+
+    /// <summary>The interval between decibel grid lines.</summary>
+    private const float GridStepDb = 10.0f;
+
+    /// <summary>The opacity applied to decibel grid lines.</summary>
+    private const byte GridLineAlpha = 100;
+
+    /// <summary>The grid line thickness relative to the theme grid thickness.</summary>
+    private const float GridLineThicknessScale = 0.5f;
+
+    /// <summary>The grid label font size relative to the theme font size.</summary>
+    private const float GridLabelFontScale = 0.8f;
+
+    /// <summary>The divisor used to vertically center grid label text.</summary>
+    private const float GridLabelVerticalAlignmentDivisor = 3.0f;
+
+    /// <summary>The meter size relative to the available cross-axis dimension.</summary>
+    private const float MeterCrossAxisScale = 0.8f;
+
+    /// <summary>The spacing between channel meters relative to the available dimension.</summary>
+    private const float MeterSpacingScale = 0.05f;
+
+    /// <summary>The meter bar width relative to the meter cross-axis dimension.</summary>
+    private const float BarWidthScale = 0.15f;
+
+    /// <summary>The spacing between meter bars relative to the meter cross-axis dimension.</summary>
+    private const float BarSpacingScale = 0.05f;
+
+    /// <summary>The number of segmented bars drawn for each channel.</summary>
+    private const int BarCount = 20;
+
+    /// <summary>The height of vertical bars relative to the meter height.</summary>
+    private const float VerticalBarHeightScale = 0.1f;
+
+    /// <summary>The opacity applied to channel meter backgrounds.</summary>
+    private const byte MeterBackgroundAlpha = 128;
+
+    /// <summary>The opacity applied to inactive meter bars.</summary>
+    private const byte InactiveBarAlpha = 80;
+
+    /// <summary>The thickness of the peak hold indicator, in pixels.</summary>
+    private const float PeakIndicatorThickness = 4.0f;
+
+    /// <summary>Half the peak hold indicator thickness, used to position it.</summary>
+    private const float PeakIndicatorOffset = 2.0f;
+
+    /// <summary>The lower normalized threshold for drawing the peak hold indicator.</summary>
+    private const float PeakIndicatorMinimumPosition = 0.0f;
+
+    /// <summary>The upper normalized threshold for drawing the peak hold indicator.</summary>
+    private const float PeakIndicatorMaximumPosition = 1.0f;
+
+    /// <summary>The full-intensity color component used for active meter bars.</summary>
+    private const byte ActiveBarFullColorComponent = 255;
+
+    /// <summary>The low-intensity color component used for active meter bars.</summary>
+    private const byte ActiveBarLowColorComponent = 60;
+
+    /// <summary>The peak indicator red component.</summary>
+    private const byte PeakIndicatorRed = 255;
+
+    /// <summary>The peak indicator green component.</summary>
+    private const byte PeakIndicatorGreen = 200;
+
+    /// <summary>The peak indicator blue component.</summary>
+    private const byte PeakIndicatorBlue = 100;
+
     private readonly ScopeTheme _theme;
     private readonly RingBuffer _rmsBuffer;
     private readonly RingBuffer _peakBuffer;
     private readonly int _sampleRate;
     private readonly int _channels;
-    private float _minDb = -60;
-    private TimeSpan _holdPeakFor = TimeSpan.FromSeconds(1);
-    private TimeSpan _attackTime = TimeSpan.FromMilliseconds(10);
-    private TimeSpan _releaseTime = TimeSpan.FromMilliseconds(300);
-    private float _peakDecayDbPerSecond = 30.0f;
+    private float _minDb = DefaultMinDb;
+    private TimeSpan _holdPeakFor = DefaultPeakHoldDuration;
+    private TimeSpan _attackTime = DefaultAttackTime;
+    private TimeSpan _releaseTime = DefaultReleaseTime;
+    private float _peakDecayDbPerSecond = DefaultPeakDecayDbPerSecond;
     private bool _horizontal = false;
     private float[] _channelRms = Array.Empty<float>();
     private float[] _channelPeak = Array.Empty<float>();
@@ -33,7 +141,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
     public float MinDb
     {
         get => _minDb;
-        set => _minDb = Math.Clamp(value, -120, 0);
+        set => _minDb = Math.Clamp(value, MinDbLowerBound, MinDbUpperBound);
     }
 
     /// <summary>
@@ -42,7 +150,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
     public TimeSpan HoldPeakFor
     {
         get => _holdPeakFor;
-        set => _holdPeakFor = value > TimeSpan.Zero ? value : TimeSpan.FromSeconds(0.1);
+        set => _holdPeakFor = value > TimeSpan.Zero ? value : MinimumPeakHoldDuration;
     }
 
     /// <summary>
@@ -51,7 +159,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
     public TimeSpan AttackTime
     {
         get => _attackTime;
-        set => _attackTime = value > TimeSpan.Zero ? value : TimeSpan.FromMilliseconds(1);
+        set => _attackTime = value > TimeSpan.Zero ? value : MinimumAttackTime;
     }
 
     /// <summary>
@@ -60,7 +168,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
     public TimeSpan ReleaseTime
     {
         get => _releaseTime;
-        set => _releaseTime = value > TimeSpan.Zero ? value : TimeSpan.FromMilliseconds(10);
+        set => _releaseTime = value > TimeSpan.Zero ? value : MinimumReleaseTime;
     }
 
     /// <summary>
@@ -70,7 +178,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
     public float PeakDecayDbPerSecond
     {
         get => _peakDecayDbPerSecond;
-        set => _peakDecayDbPerSecond = Math.Clamp(value, 0.1f, 1000.0f);
+        set => _peakDecayDbPerSecond = Math.Clamp(value, MinimumPeakDecayDbPerSecond, MaximumPeakDecayDbPerSecond);
     }
 
     /// <summary>
@@ -185,7 +293,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
                 channelSamples[i] = filteredSample;
                 
                 // Clip detection - latched
-                if (Math.Abs(filteredSample) >= 1.0f)
+                if (Math.Abs(filteredSample) >= ClippingThreshold)
                 {
                     _channelClipping[ch] = true;
                 }
@@ -323,18 +431,17 @@ public sealed class VuMeterRenderer : IScopeRenderer
         {
             // Draw horizontal dB grid lines from -60dB to 0dB
             float minDb = _minDb;
-            float maxDb = 0;
-            float stepDb = 10;
+            float maxDb = MinDbUpperBound;
 
-            for (float db = minDb; db <= maxDb; db += stepDb)
+            for (float db = minDb; db <= maxDb; db += GridStepDb)
             {
                 float yPos = bounds.Bottom - ((db - minDb) / (maxDb - minDb) * bounds.Height);
                 yPos = Math.Clamp(yPos, bounds.Top, bounds.Bottom);
 
                 using var gridPaint = new SKPaint
                 {
-                    Color = _theme.GridColor.WithAlpha(100).ToSKColor(),
-                    StrokeWidth = _theme.GridThickness * 0.5f,
+                    Color = _theme.GridColor.WithAlpha(GridLineAlpha).ToSKColor(),
+                    StrokeWidth = _theme.GridThickness * GridLineThicknessScale,
                     IsAntialias = true,
                     Style = SKPaintStyle.Stroke
                 };
@@ -346,13 +453,13 @@ public sealed class VuMeterRenderer : IScopeRenderer
                 using var textPaint = new SKPaint
                 {
                     Color = _theme.TextColor.ToSKColor(),
-                    TextSize = _theme.FontSize * 0.8f,
+                    TextSize = _theme.FontSize * GridLabelFontScale,
                     IsAntialias = true,
                     TextAlign = SKTextAlign.Right
                 };
 
-                float xPos = bounds.Left - 4;
-                canvas.DrawText(label, xPos, yPos + (_theme.FontSize * 0.8f / 3), textPaint);
+                float xPos = bounds.Left - GridLabelOffset;
+                canvas.DrawText(label, xPos, yPos + (_theme.FontSize * GridLabelFontScale / GridLabelVerticalAlignmentDivisor), textPaint);
             }
         }
 
@@ -372,16 +479,16 @@ public sealed class VuMeterRenderer : IScopeRenderer
         if (_horizontal)
         {
             meterWidth = bounds.Width / _channels;
-            meterHeight = bounds.Height * 0.8f;
-            meterSpacing = bounds.Width * 0.05f;
+            meterHeight = bounds.Height * MeterCrossAxisScale;
+            meterSpacing = bounds.Width * MeterSpacingScale;
             meterX = bounds.Left + (bounds.Width - (meterWidth * _channels + meterSpacing * (_channels - 1))) / 2;
             meterY = bounds.MidY - (meterHeight / 2);
         }
         else
         {
-            meterWidth = bounds.Width * 0.8f;
+            meterWidth = bounds.Width * MeterCrossAxisScale;
             meterHeight = bounds.Height / _channels;
-            meterSpacing = bounds.Height * 0.05f;
+            meterSpacing = bounds.Height * MeterSpacingScale;
             meterX = bounds.MidX - (meterWidth / 2);
             meterY = bounds.Top + (bounds.Height - (meterHeight * _channels + meterSpacing * (_channels - 1))) / 2;
         }
@@ -431,7 +538,7 @@ public sealed class VuMeterRenderer : IScopeRenderer
         // Draw meter background (filled rectangle)
         using (var bgPaint = new SKPaint
         {
-            Color = _theme.GridColor.WithAlpha(128).ToSKColor(),
+            Color = _theme.GridColor.WithAlpha(MeterBackgroundAlpha).ToSKColor(),
             Style = SKPaintStyle.Fill
         })
         {
@@ -439,17 +546,16 @@ public sealed class VuMeterRenderer : IScopeRenderer
         }
 
         // Draw meter bars (vertical or horizontal)
-        float barWidth = bounds.Width * 0.15f;
-        float barSpacing = bounds.Width * 0.05f;
+        float barWidth = bounds.Width * BarWidthScale;
+        float barSpacing = bounds.Width * BarSpacingScale;
 
         if (_horizontal)
         {
-            barWidth = bounds.Height * 0.15f;
-            barSpacing = bounds.Height * 0.05f;
+            barWidth = bounds.Height * BarWidthScale;
+            barSpacing = bounds.Height * BarSpacingScale;
         }
 
-        int barCount = 20;
-        float totalBarSpace = barWidth * barCount + barSpacing * (barCount - 1);
+        float totalBarSpace = barWidth * BarCount + barSpacing * (BarCount - 1);
         float startX, startY;
 
         if (_horizontal)
@@ -460,13 +566,13 @@ public sealed class VuMeterRenderer : IScopeRenderer
         else
         {
             startX = bounds.Left;
-            startY = bounds.Bottom - (bounds.Height * 0.1f);
+            startY = bounds.Bottom - (bounds.Height * VerticalBarHeightScale);
         }
 
         // Draw bars with color zones
-        for (int i = 0; i < barCount; i++)
+        for (int i = 0; i < BarCount; i++)
         {
-            float barValue = (i + 1) / (float)barCount;
+            float barValue = (i + 1) / (float)BarCount;
             float barHeightOrWidth = 0;
             SKColor barColor;
 
@@ -477,29 +583,29 @@ public sealed class VuMeterRenderer : IScopeRenderer
             }
             else
             {
-                barHeightOrWidth = bounds.Height * 0.1f;
+                barHeightOrWidth = bounds.Height * VerticalBarHeightScale;
             }
 
             // Determine color based on level
             if (barValue <= peakHoldPos)
             {
                 // Peak hold area - red
-                barColor = new SKColor(255, 60, 60);
+                barColor = new SKColor(ActiveBarFullColorComponent, ActiveBarLowColorComponent, ActiveBarLowColorComponent);
             }
             else if (barValue <= peakPos)
             {
                 // Current peak area - yellow
-                barColor = new SKColor(255, 255, 60);
+                barColor = new SKColor(ActiveBarFullColorComponent, ActiveBarFullColorComponent, ActiveBarLowColorComponent);
             }
             else if (barValue <= rmsPos)
             {
                 // RMS area - green
-                barColor = new SKColor(60, 255, 60);
+                barColor = new SKColor(ActiveBarLowColorComponent, ActiveBarFullColorComponent, ActiveBarLowColorComponent);
             }
             else
             {
                 // Background area - dark gray
-                barColor = _theme.GridColor.WithAlpha(80).ToSKColor();
+                barColor = _theme.GridColor.WithAlpha(InactiveBarAlpha).ToSKColor();
             }
 
             // Calculate bar position and size using LevelToPosition for decibel scaling
@@ -537,28 +643,28 @@ public sealed class VuMeterRenderer : IScopeRenderer
         }
 
         // Draw peak hold indicator
-        if (peakHoldPos > 0 && peakHoldPos <= 1)
+        if (peakHoldPos > PeakIndicatorMinimumPosition && peakHoldPos <= PeakIndicatorMaximumPosition)
         {
             float indicatorX, indicatorY, indicatorWidth, indicatorHeight;
 
             if (_horizontal)
             {
-                indicatorX = startX + peakHoldPos * bounds.Width - 2;
+                indicatorX = startX + peakHoldPos * bounds.Width - PeakIndicatorOffset;
                 indicatorY = bounds.Top;
-                indicatorWidth = 4;
+                indicatorWidth = PeakIndicatorThickness;
                 indicatorHeight = bounds.Height;
             }
             else
             {
                 indicatorX = bounds.Left;
-                indicatorY = startY - peakHoldPos * bounds.Height + 2;
+                indicatorY = startY - peakHoldPos * bounds.Height + PeakIndicatorOffset;
                 indicatorWidth = bounds.Width;
-                indicatorHeight = 4;
+                indicatorHeight = PeakIndicatorThickness;
             }
 
             using (var indicatorPaint = new SKPaint
             {
-                Color = new SKColor(255, 200, 100),
+                Color = new SKColor(PeakIndicatorRed, PeakIndicatorGreen, PeakIndicatorBlue),
                 Style = SKPaintStyle.Fill
             })
             {
@@ -573,9 +679,9 @@ private float LevelToPosition(float level)
 	{
 		// Map level via 20*log10 and clamp at -60dB floor
 		float db = 20 * MathF.Log10(level);
-		db = MathF.Max(db, -60); // Clamp at -60dB floor
+		db = MathF.Max(db, DefaultMinDb); // Clamp at -60dB floor
 		// Convert from dB to normalized position: -60dB = 0, 0dB = 1
-		return (db + 60) / 60;
+		return (db - DefaultMinDb) / -DefaultMinDb;
 	}
 	else
 	{
@@ -589,10 +695,10 @@ private float LevelToPosition(float level)
     {
         if (linear <= 0)
         {
-            return -120;
+            return MinDbLowerBound;
         }
 
         float db = 20 * MathF.Log10(linear);
-        return Math.Clamp(db, -120, 0);
+        return Math.Clamp(db, MinDbLowerBound, MinDbUpperBound);
     }
 }
