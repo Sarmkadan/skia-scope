@@ -93,9 +93,15 @@ public sealed class CompositeScopeRenderer : IScopeRenderer
     /// <param name="renderer">The renderer to add.</param>
     /// <param name="enabled">Whether the layer is enabled by default.</param>
     /// <exception cref="ArgumentNullException">Thrown if renderer is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if renderer is this composite renderer.</exception>
     public void AddRenderer(IScopeRenderer renderer, bool enabled = true)
     {
         ArgumentNullException.ThrowIfNull(renderer);
+        if (ReferenceEquals(renderer, this))
+        {
+            throw new ArgumentException("A composite renderer cannot be added to itself.", nameof(renderer));
+        }
+
         renderer.Theme = _theme;
         renderer.SampleRate = _sampleRate;
         _layers.Add(new Layer(renderer) { IsEnabled = enabled });
@@ -129,7 +135,10 @@ public sealed class CompositeScopeRenderer : IScopeRenderer
         ArgumentNullException.ThrowIfNull(renderer);
         if (newIndex < 0 || newIndex >= _layers.Count)
         {
-            throw new ArgumentOutOfRangeException(nameof(newIndex), "Index out of range.");
+            throw new ArgumentOutOfRangeException(
+                nameof(newIndex),
+                newIndex,
+                $"Layer index must be between 0 and {_layers.Count - 1}.");
         }
 
         var layer = _layers.FirstOrDefault(l => l.Renderer == renderer);
