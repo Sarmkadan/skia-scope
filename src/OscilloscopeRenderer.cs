@@ -19,9 +19,7 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     private SKBitmap? _previousFrame;
     private ITrigger? _triggerStrategy;
     private bool _enableEdgeAlignment = false;
-    private float _edgeThreshold = 0.0f;
-    private float _edgeHysteresis = 0.1f;
-    private int _edgeHoldoffSamples = 0;
+    private EdgeTrigger _edgeAlignmentTrigger = new(0.0f, 0.1f, 0);
 
     /// <summary>
     /// Gets or sets the number of points to display.
@@ -84,8 +82,11 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     /// </summary>
     public float EdgeThreshold
     {
-        get => _edgeThreshold;
-        set => _edgeThreshold = Math.Clamp(value, -1.0f, 1.0f);
+        get => _edgeAlignmentTrigger.Threshold;
+        set => ConfigureEdgeAlignment(
+            Math.Clamp(value, -1.0f, 1.0f),
+            EdgeHysteresis,
+            EdgeHoldoffSamples);
     }
 
     /// <summary>
@@ -93,8 +94,11 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     /// </summary>
     public float EdgeHysteresis
     {
-        get => _edgeHysteresis;
-        set => _edgeHysteresis = Math.Clamp(value, 0.0f, 0.5f);
+        get => _edgeAlignmentTrigger.Hysteresis;
+        set => ConfigureEdgeAlignment(
+            EdgeThreshold,
+            Math.Clamp(value, 0.0f, 0.5f),
+            EdgeHoldoffSamples);
     }
 
     /// <summary>
@@ -102,8 +106,11 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     /// </summary>
     public int EdgeHoldoffSamples
     {
-        get => _edgeHoldoffSamples;
-        set => _edgeHoldoffSamples = Math.Max(0, value);
+        get => _edgeAlignmentTrigger.HoldoffSamples;
+        set => ConfigureEdgeAlignment(
+            EdgeThreshold,
+            EdgeHysteresis,
+            Math.Max(0, value));
     }
 
     /// <summary>
@@ -176,20 +183,31 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
     }
 
     /// <summary>
-    /// Aligns the waveform to the trigger condition if enabled.
+    /// Replaces the legacy edge trigger with one using the specified configuration.
+    /// </summary>
+    /// <param name="threshold">The threshold level for edge detection.</param>
+    /// <param name="hysteresis">The hysteresis band width.</param>
+    /// <param name="holdoffSamples">The minimum number of samples between triggers.</param>
+    private void ConfigureEdgeAlignment(float threshold, float hysteresis, int holdoffSamples)
+    {
+        _edgeAlignmentTrigger = new EdgeTrigger(threshold, hysteresis, holdoffSamples);
+    }
+
+    /// <summary>
+    /// Aligns the waveform using the configured trigger strategy.
     /// </summary>
     /// <param name="xPoints">The X channel points.</param>
-    /// <param name="yPoints">The Y channel points.</param>
     /// <returns>The number of samples to skip for alignment, or 0 if no alignment.</returns>
-    private int AlignToTrigger(Span<float> xPoints, Span<float> yPoints)
+    private int AlignToTrigger(Span<float> xPoints)
     {
-        if (xPoints.Length < 2 || _triggerStrategy == null)
+        ITrigger? trigger = _enableEdgeAlignment ? _edgeAlignmentTrigger : _triggerStrategy;
+        if (xPoints.Length < 2 || trigger == null)
         {
             return 0;
         }
 
         // Use X channel (left channel) for trigger detection
-        int? triggerIndex = _triggerStrategy.FindTriggerIndex(xPoints);
+        int? triggerIndex = trigger.FindTriggerIndex(xPoints);
 
         if (triggerIndex.HasValue && triggerIndex.Value > 0 && triggerIndex.Value < xPoints.Length - 1)
         {
@@ -233,7 +251,7 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
         _yBuffer.ReadLatest(yPoints);
 
         // Align to trigger if enabled
-        int startIndex = AlignToTrigger(xPoints, yPoints);
+        int startIndex = AlignToTrigger(xPoints);
         int alignedCount = pointCount - startIndex;
 
         if (alignedCount < 2)
