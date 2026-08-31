@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 
 namespace SkiaScope;
 
@@ -10,7 +11,7 @@ public sealed class AutoTrigger : ITrigger
 {
     private readonly ITrigger? _fallbackTrigger;
     private readonly TimeSpan _timeout;
-    private DateTime _lastTriggerTime = DateTime.MinValue;
+    private long _lastTriggerTimestamp;
     private int? _lastTriggerIndex;
 
     /// <summary>
@@ -19,14 +20,14 @@ public sealed class AutoTrigger : ITrigger
     public ITrigger? FallbackTrigger => _fallbackTrigger;
 
     /// <summary>
-    /// Gets the timeout duration before falling back to free-run mode.
+    /// Gets the elapsed duration without a trigger before falling back to free-run mode.
     /// </summary>
     public TimeSpan Timeout => _timeout;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AutoTrigger"/> class.
     /// </summary>
-    /// <param name="timeout">The timeout duration before falling back to free-run mode.</param>
+    /// <param name="timeout">The elapsed duration without a trigger before falling back to free-run mode.</param>
     /// <param name="fallbackTrigger">Optional fallback trigger to use when conditions are met. If null, always returns free-run.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if timeout is negative or zero.</exception>
     public AutoTrigger(TimeSpan timeout, ITrigger? fallbackTrigger = null)
@@ -64,7 +65,7 @@ public sealed class AutoTrigger : ITrigger
             int? triggerIndex = _fallbackTrigger.FindTriggerIndex(signal);
             if (triggerIndex.HasValue && triggerIndex.Value >= 0)
             {
-                _lastTriggerTime = DateTime.UtcNow;
+                _lastTriggerTimestamp = Stopwatch.GetTimestamp();
                 _lastTriggerIndex = triggerIndex.Value;
                 return triggerIndex.Value;
             }
@@ -72,7 +73,8 @@ public sealed class AutoTrigger : ITrigger
 
         // Check timeout: if we haven't had a trigger for longer than the timeout,
         // fall back to free-run by returning null
-        if (_lastTriggerIndex.HasValue && DateTime.UtcNow - _lastTriggerTime > _timeout)
+        if (_lastTriggerIndex.HasValue &&
+            Stopwatch.GetElapsedTime(_lastTriggerTimestamp, Stopwatch.GetTimestamp()) > _timeout)
         {
             // Reset to ensure we don't immediately fall back again
             _lastTriggerIndex = null;
