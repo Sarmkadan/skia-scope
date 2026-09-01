@@ -22,7 +22,12 @@ public enum FftWindow
     /// <summary>
     /// Hamming window - similar to Hann but with different coefficients for better side‑lobe suppression.
     /// </summary>
-    Hamming = 2
+    Hamming = 2,
+
+    /// <summary>
+    /// Blackman window - provides stronger side‑lobe suppression at the cost of a wider main lobe.
+    /// </summary>
+    Blackman = 3
 }
 
 /// <summary>
@@ -294,6 +299,17 @@ public sealed class Fft
                 {
                     float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
                     _windowCoefficients[i] = 0.54f - 0.46f * MathF.Cos(2f * MathF.PI * normalizedIndex);
+                }
+                break;
+
+            case FftWindow.Blackman:
+                // Blackman window: w(n) = 0.42 - 0.5 · cos(2πn/(N‑1)) + 0.08 · cos(4πn/(N‑1))
+                for (int i = 0; i < Size; i++)
+                {
+                    float normalizedIndex = i / (float)Math.Max(Size - 1, 1);
+                    _windowCoefficients[i] = 0.42f
+                        - 0.5f * MathF.Cos(2f * MathF.PI * normalizedIndex)
+                        + 0.08f * MathF.Cos(4f * MathF.PI * normalizedIndex);
                 }
                 break;
 
