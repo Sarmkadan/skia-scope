@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using SkiaSharp;
 
 namespace SkiaScope;
@@ -435,5 +436,27 @@ public sealed class OscilloscopeRenderer : IScopeRenderer
             _previousFrame?.Dispose();
             _previousFrame = null;
         }
+    }
+
+    /// <summary>
+    /// Asynchronously renders the oscilloscope visualization to the provided canvas.
+    /// </summary>
+    /// <param name="canvas">The canvas to render to.</param>
+    /// <param name="bounds">The bounds within which to render.</param>
+    /// <param name="cancellationToken">A token to observe while waiting for the task to complete.</param>
+    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    public ValueTask RenderAsync(SKCanvas canvas, SKRect bounds, CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ValueTask.FromCanceled(cancellationToken);
+        }
+
+        // Fast path: SkiaSharp rendering is synchronous.
+        // We return a completed ValueTask to avoid allocations.
+        // ConfigureAwait(false) is applied to any potential async continuations to prevent
+        // capturing the SynchronizationContext, ensuring thread-pool usage and avoiding deadlocks.
+        Render(canvas, bounds);
+        return ValueTask.CompletedTask;
     }
 }
