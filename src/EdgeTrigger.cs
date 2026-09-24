@@ -1,4 +1,6 @@
 using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace SkiaScope;
 
@@ -58,7 +60,6 @@ public sealed class EdgeTrigger : ITrigger
     /// </summary>
     /// <param name="signal">The input signal to analyze.</param>
     /// <returns>The index of the first rising edge crossing, or -1 if no edge found.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if signal is null.</exception>
     /// <exception cref="ArgumentException">Thrown if signal length is less than 2.</exception>
     public int? FindTriggerIndex(ReadOnlySpan<float> signal)
     {
@@ -67,36 +68,42 @@ public sealed class EdgeTrigger : ITrigger
             throw new ArgumentException("Signal must have at least 2 samples", nameof(signal));
         }
 
-        // Define the rising edge detection bands
-        // We trigger when signal goes from below (threshold - hysteresis) to above (threshold + hysteresis)
         float lowerThreshold = _threshold - _hysteresis;
         float upperThreshold = _threshold + _hysteresis;
 
-        // Track whether we're currently in the "below hysteresis band" region
-        bool wasInLowerBand = signal[0] < lowerThreshold;
+        // Cache fields to locals for faster access and potential register allocation
+        int lastTriggerIndex = _lastTriggerIndex;
+        int holdoffSamples = _holdoffSamples;
+        int length = signal.Length;
 
-        for (int i = 0; i < signal.Length - 1; i++)
+        // Use ref to eliminate bounds checks in the loop
+        ref float start = ref MemoryMarshal.GetReference(signal);
+        bool wasInLowerBand = start < lowerThreshold;
+
+        for (int i = 0; i < length - 1; i++)
         {
-            float current = signal[i];
-            float next = signal[i + 1];
+            ref float current = ref Unsafe.Add(ref start, i);
+            ref float next = ref Unsafe.Add(ref start, i + 1);
 
-            // Check if we're crossing from below lower threshold to above upper threshold
-            bool isRisingEdge = wasInLowerBand && current <= lowerThreshold && next >= upperThreshold;
+            // Check holdoff first to skip edge detection when not needed
+            bool isAfterHoldoff = lastTriggerIndex < 0 || i >= lastTriggerIndex + holdoffSamples;
 
-            // Check holdoff: ensure we're far enough from the last trigger
-            bool isAfterHoldoff = _lastTriggerIndex < 0 || i >= _lastTriggerIndex + _holdoffSamples;
-
-            if (isRisingEdge && isAfterHoldoff)
+            if (isAfterHoldoff)
             {
-                _lastTriggerIndex = i;
-                return i;
+                // Check for rising edge: was in lower band, current <= lower, next >= upper
+                if (wasInLowerBand && current <= lowerThreshold && next >= upperThreshold)
+                {
+                    lastTriggerIndex = i;
+                    _lastTriggerIndex = lastTriggerIndex;
+                    return i;
+                }
             }
 
             // Update state for next iteration
             wasInLowerBand = current < lowerThreshold;
         }
 
-        return null; // No rising edge found
+        return null;
     }
 
     /// <summary>
