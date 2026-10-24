@@ -377,21 +377,11 @@ public sealed class ScopeTheme
     public float FontSize { get; init; } = 12.0f;
 
     /// <summary>
-    /// Ensures the theme values are valid.
+    /// Ensures the theme values are valid. Uses the same rules as <see cref="ThemeValidator"/>,
+    /// so constructors and <c>IsValid()</c> always agree.
     /// </summary>
     /// <exception cref="ArgumentException">Thrown if theme is invalid.</exception>
-    public void EnsureValid()
-    {
-        if (GridThickness <= 0)
-        {
-            throw new ArgumentException("GridThickness must be positive", nameof(GridThickness));
-        }
-
-        if (FontSize <= 0)
-        {
-            throw new ArgumentException("FontSize must be positive", nameof(FontSize));
-        }
-    }
+    public void EnsureValid() => new ThemeValidator(this).EnsureValid();
 }
 
 /// <summary>
