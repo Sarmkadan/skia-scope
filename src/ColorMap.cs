@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using SkiaSharp;
 
@@ -24,29 +26,108 @@ public sealed class ColorMap
     /// </summary>
     public static SKColor NegativeInfinitySentinelColor { get; } = new SKColor(0, 0, 255, 255); // Bright blue
 
-    private readonly SKColor[] _stops;
-    private readonly float[] _positions;
+    private readonly ReadOnlyCollection<ColorStop> _stops;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ColorMap"/> class.
+    /// Initializes a new instance of the <see cref="ColorMap"/> class with colors spaced evenly over [0, 1].
     /// </summary>
-    /// <param name="stops">The color stops to use in the color map.</param>
+    /// <param name="stops">The colors to use in the color map. At least two are required.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="stops"/> is null.</exception>
+    /// <exception cref="InvalidColorMapException">Thrown when fewer than two colors are supplied.</exception>
     public ColorMap(SKColor[] stops)
+        : this(SpaceEvenly(stops))
     {
-        ArgumentNullException.ThrowIfNull(stops);
-        if (stops.Length < 2)
-            throw new ArgumentException("At least two color stops are required", nameof(stops));
+    }
 
-        _stops = stops;
-        _positions = Enumerable.Range(0, stops.Length)
-            .Select(i => (float)i / (stops.Length - 1))
-            .ToArray();
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ColorMap"/> class from explicitly positioned stops.
+    /// </summary>
+    /// <param name="stops">The color stops to use in the color map. See <see cref="Validate"/> for the rules they must satisfy.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="stops"/> is null.</exception>
+    /// <exception cref="InvalidColorMapException">Thrown when the stops violate any validation rule.</exception>
+    public ColorMap(ColorStop[] stops)
+    {
+        Validate(stops);
+        _stops = Array.AsReadOnly((ColorStop[])stops.Clone());
     }
 
     /// <summary>
     /// Gets the number of color stops defining this color map.
     /// </summary>
-    public int StopCount => _stops.Length;
+    public int StopCount => _stops.Count;
+
+    /// <summary>
+    /// Gets the color stops defining this color map, ordered by position.
+    /// </summary>
+    public IReadOnlyList<ColorStop> Stops => _stops;
+
+    /// <summary>
+    /// Validates a sequence of color stops against the rules required by <see cref="ColorMap"/>.
+    /// </summary>
+    /// <remarks>
+    /// The rules, checked in this order, are:
+    /// <list type="number">
+    ///   <item><description>At least two stops are present.</description></item>
+    ///   <item><description>Each position is a finite number in [0, 1]. Stops at exactly 0 and 1 are allowed.</description></item>
+    ///   <item><description>Positions are sorted in ascending order.</description></item>
+    ///   <item><description>No two stops share a position.</description></item>
+    ///   <item><description>The first stop is at position 0.</description></item>
+    ///   <item><description>The last stop is at position 1.</description></item>
+    /// </list>
+    /// </remarks>
+    /// <param name="stops">The stops to validate.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="stops"/> is null.</exception>
+    /// <exception cref="InvalidColorMapException">
+    /// Thrown on the first violated rule. <see cref="InvalidColorMapException.Index"/> is the index of the offending stop
+    /// (for a duplicate or out-of-order position, the later of the two), or -1 when fewer than two stops are present.
+    /// </exception>
+    public static void Validate(IReadOnlyList<ColorStop> stops)
+    {
+        ArgumentNullException.ThrowIfNull(stops);
+
+        if (stops.Count < 2)
+        {
+            throw new InvalidColorMapException(-1, $"at least 2 color stops are required (has {stops.Count})");
+        }
+
+        for (var i = 0; i < stops.Count; i++)
+        {
+            var position = stops[i].Position;
+
+            // Written as a negated comparison so that NaN is rejected too.
+            if (!(position >= 0f && position <= 1f))
+            {
+                throw new InvalidColorMapException(i, $"position {position} is outside [0, 1]");
+            }
+
+            if (i == 0)
+            {
+                continue;
+            }
+
+            var previous = stops[i - 1].Position;
+            if (position == previous)
+            {
+                throw new InvalidColorMapException(i, $"position {position} duplicates the previous stop");
+            }
+
+            if (position < previous)
+            {
+                throw new InvalidColorMapException(i, $"position {position} is before previous position {previous}; stops must be sorted by position");
+            }
+        }
+
+        if (stops[0].Position != 0f)
+        {
+            throw new InvalidColorMapException(0, $"the first stop must be at position 0 (is {stops[0].Position})");
+        }
+
+        var last = stops.Count - 1;
+        if (stops[last].Position != 1f)
+        {
+            throw new InvalidColorMapException(last, $"the last stop must be at position 1 (is {stops[last].Position})");
+        }
+    }
 
     /// <summary>
     /// Maps a value to a color based on the color stops in this color map.
@@ -84,21 +165,18 @@ public sealed class ColorMap
         // Clamp regular values to [0, 1] range
         value = Math.Clamp(value, 0f, 1f);
 
-        if (_stops.Length == 1)
+        for (var i = 0; i < _stops.Count - 1; i++)
         {
-            return _stops[0];
-        }
-
-        for (var i = 0; i < _positions.Length - 1; i++)
-        {
-            if (value >= _positions[i] && value <= _positions[i + 1])
+            var from = _stops[i];
+            var to = _stops[i + 1];
+            if (value >= from.Position && value <= to.Position)
             {
-                var t = (value - _positions[i]) / (_positions[i + 1] - _positions[i]);
-                return Lerp(_stops[i], _stops[i + 1], t);
+                var t = (value - from.Position) / (to.Position - from.Position);
+                return Lerp(from.Color, to.Color, t);
             }
         }
 
-        return _stops[^1];
+        return _stops[^1].Color;
     }
 
     /// <summary>
@@ -119,6 +197,19 @@ public sealed class ColorMap
         }
 
         return lut;
+    }
+
+    private static ColorStop[] SpaceEvenly(SKColor[] colors)
+    {
+        ArgumentNullException.ThrowIfNull(colors);
+        if (colors.Length < 2)
+        {
+            throw new InvalidColorMapException(-1, $"at least 2 color stops are required (has {colors.Length})");
+        }
+
+        return colors
+            .Select((color, i) => new ColorStop(color, (float)i / (colors.Length - 1)))
+            .ToArray();
     }
 
     /// <summary>
