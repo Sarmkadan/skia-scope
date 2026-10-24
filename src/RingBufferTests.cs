@@ -22,6 +22,10 @@ public static class RingBufferTests
     TestTryPeek();
     TestCopyLatest();
     TestTryPeekLast();
+    TestSpscBasicWriteRead();
+    TestSpscFullBufferTruncates();
+    TestSpscClear();
+    TestSpscConcurrentProduceConsume();
 
     Console.WriteLine("All RingBufferTests passed successfully.");
   }
@@ -410,5 +414,165 @@ private static void TestCapacityValidation()
       if (value != 3.0f) throw new Exception($"Expected 3.0, got {value}");
 
       Console.WriteLine(" ✓ TryPeekLast works correctly");
+  }
+
+  private static void TestSpscBasicWriteRead()
+  {
+    Console.WriteLine(" Testing SpscRingBuffer basic write/read with wraparound...");
+    var buffer = new SpscRingBuffer(5);
+
+    if (buffer.Write(new float[] { 1.0f, 2.0f, 3.0f }) != 3)
+      throw new Exception("Expected 3 samples accepted by SPSC write");
+
+    var first = new float[2];
+    if (buffer.Read(first) != 2 || first[0] != 1.0f || first[1] != 2.0f)
+      throw new Exception("SPSC read did not return the oldest samples in order");
+
+    // Wraps around the end of the underlying array: slots 3, 4, then 0, 1.
+    if (buffer.Write(new float[] { 4.0f, 5.0f, 6.0f, 7.0f }) != 4)
+      throw new Exception("Expected 4 samples accepted by SPSC write across wraparound");
+
+    if (buffer.Count != 5)
+      throw new Exception($"Expected SPSC count 5, got {buffer.Count}");
+
+    var rest = new float[5];
+    int readCount = buffer.Read(rest);
+    float[] expected = { 3.0f, 4.0f, 5.0f, 6.0f, 7.0f };
+    if (readCount != 5)
+      throw new Exception($"Expected 5 samples from SPSC read, got {readCount}");
+    for (int i = 0; i < expected.Length; i++)
+    {
+      if (rest[i] != expected[i])
+        throw new Exception($"SPSC wraparound sample {i}: expected {expected[i]}, got {rest[i]}");
+    }
+
+    if (buffer.Read(rest) != 0 || buffer.Count != 0)
+      throw new Exception("SPSC buffer should be empty after reading everything");
+
+    Console.WriteLine(" ✓ SpscRingBuffer basic write/read works");
+  }
+
+  private static void TestSpscFullBufferTruncates()
+  {
+    Console.WriteLine(" Testing SpscRingBuffer truncation when full...");
+    var buffer = new SpscRingBuffer(4);
+
+    if (buffer.Write(new float[] { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f }) != 4)
+      throw new Exception("SPSC write should accept only the samples that fit");
+    if (buffer.Write(new float[] { 7.0f }) != 0)
+      throw new Exception("SPSC write to a full buffer should accept nothing");
+
+    // Unread data must not be overwritten: the original four samples come back intact.
+    var dest = new float[4];
+    if (buffer.Read(dest) != 4 || dest[0] != 1.0f || dest[3] != 4.0f)
+      throw new Exception("SPSC buffer overwrote unread samples");
+
+    Console.WriteLine(" ✓ SpscRingBuffer truncation works correctly");
+  }
+
+  private static void TestSpscClear()
+  {
+    Console.WriteLine(" Testing SpscRingBuffer clear...");
+    var buffer = new SpscRingBuffer(4);
+    buffer.Write(new float[] { 1.0f, 2.0f, 3.0f });
+
+    buffer.Clear();
+    if (buffer.Count != 0)
+      throw new Exception($"Expected SPSC count 0 after clear, got {buffer.Count}");
+
+    buffer.Write(new float[] { 9.0f });
+    var dest = new float[2];
+    if (buffer.Read(dest) != 1 || dest[0] != 9.0f)
+      throw new Exception("SPSC buffer should return only samples written after clear");
+
+    Console.WriteLine(" ✓ SpscRingBuffer clear works correctly");
+  }
+
+  private static void TestSpscConcurrentProduceConsume()
+  {
+    Console.WriteLine(" Testing SpscRingBuffer concurrent produce/consume...");
+
+    // Values are the sample indices, so they stay exact in float for this range (below 2^24).
+    const int total = 1_000_000;
+    const int chunk = 257; // Odd chunk size so reads and writes straddle the wrap point at many different offsets.
+    var buffer = new SpscRingBuffer(1024);
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+    CancellationToken token = cts.Token;
+
+    Task producer = Task.Run(() =>
+    {
+      var chunkBuffer = new float[chunk];
+      int next = 0;
+      while (next < total)
+      {
+        int n = Math.Min(chunk, total - next);
+        for (int i = 0; i < n; i++)
+          chunkBuffer[i] = next + i;
+
+        int offset = 0;
+        while (offset < n)
+        {
+          token.ThrowIfCancellationRequested();
+          int accepted = buffer.Write(chunkBuffer.AsSpan(offset, n - offset));
+          offset += accepted;
+          if (accepted == 0)
+            Thread.Yield();
+        }
+
+        next += n;
+      }
+    }, token);
+
+    Task consumer = Task.Run(() =>
+    {
+      var dest = new float[chunk];
+      int received = 0;
+      try
+      {
+        while (received < total)
+        {
+          token.ThrowIfCancellationRequested();
+          int read = buffer.Read(dest);
+          if (read == 0)
+          {
+            Thread.Yield();
+            continue;
+          }
+
+          if (buffer.Count > buffer.Capacity)
+            throw new Exception($"SPSC count {buffer.Count} exceeded capacity {buffer.Capacity}");
+
+          for (int i = 0; i < read; i++)
+          {
+            if (dest[i] != received + i)
+              throw new Exception($"SPSC sample {received + i}: expected {received + i}, got {dest[i]}");
+          }
+
+          received += read;
+        }
+      }
+      catch
+      {
+        // Stop the producer so a consumer failure is reported immediately instead of after the timeout.
+        cts.Cancel();
+        throw;
+      }
+    }, token);
+
+    try
+    {
+      Task.WaitAll(producer, consumer);
+    }
+    catch (AggregateException ex)
+    {
+      // Prefer the real failure over the cancellation it triggered in the other task.
+      Exception root = ex.Flatten().InnerExceptions.FirstOrDefault(e => e is not OperationCanceledException) ?? ex;
+      throw root;
+    }
+
+    if (buffer.Count != 0)
+      throw new Exception($"Expected SPSC buffer to be drained, count {buffer.Count}");
+
+    Console.WriteLine(" ✓ SpscRingBuffer concurrent produce/consume preserves order and content");
   }
 }
