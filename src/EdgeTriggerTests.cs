@@ -3,8 +3,10 @@ using SkiaScope;
 
 namespace SkiaScope;
 
+/// <summary>Console self-checks for <c>EdgeTrigger</c>; run them with <c>Run()</c>.</summary>
 public static class EdgeTriggerTests
 {
+    /// <summary>Executes every check in this class and throws on the first failure.</summary>
     public static void Run()
     {
         TestRisingEdgeDetection();

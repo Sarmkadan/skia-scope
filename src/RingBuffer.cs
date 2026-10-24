@@ -83,7 +83,7 @@ public sealed class RingBuffer
     /// <remarks>
     /// This counter wraps around internally when it exceeds <see cref="long.MaxValue"/>, but the returned value is the actual total written.
     /// The wraparound of this counter does not affect the buffer's storage wraparound semantics.
-    /// </summary>
+    /// </remarks>
     public long TotalWritten
     {
         get
@@ -162,7 +162,7 @@ public sealed class RingBuffer
     /// <remarks>
     /// This operation is thread-safe and may be called concurrently with other read or write operations.
     /// The copy operation respects the buffer's wraparound semantics.
-    /// </summary>
+    /// </remarks>
     public int CopyTo(Span<float> destination)
     {
         return ReadLatest(destination);
