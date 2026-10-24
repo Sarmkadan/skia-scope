@@ -5,8 +5,10 @@ using SkiaSharp;
 
 namespace SkiaScope;
 
+/// <summary>Console self-checks for <c>OscilloscopeRenderer</c>; run them with <c>Run()</c>.</summary>
 public static class OscilloscopeRendererTests
 {
+    /// <summary>Executes every check in this class and throws on the first failure.</summary>
     public static void Run()
     {
         TestPushSamplesWithNaN();

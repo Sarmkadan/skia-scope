@@ -3,8 +3,10 @@ using System.Threading;
 
 namespace SkiaScope;
 
+/// <summary>Console self-checks for <c>AutoTrigger</c>; run them with <c>Run()</c>.</summary>
 public static class AutoTriggerTests
 {
+    /// <summary>Executes every check in this class and throws on the first failure.</summary>
     public static void Run()
     {
         Console.WriteLine("Running AutoTriggerTests...");

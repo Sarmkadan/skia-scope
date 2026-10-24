@@ -4,8 +4,10 @@ using SkiaScope;
 
 namespace SkiaScope;
 
+/// <summary>Console self-checks for <c>VuMeter</c>; run them with <c>Run()</c>.</summary>
 public static class VuMeterTests
 {
+    /// <summary>Executes every check in this class and throws on the first failure.</summary>
     public static void Run()
     {
         Console.WriteLine("Running VuMeterTests...");

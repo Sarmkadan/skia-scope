@@ -35,9 +35,9 @@ public static class JsonRendererExtensions
     ///   <item><description><see cref="JsonNamingPolicy.CamelCase"/> for property naming</description></item>
     ///   <item><description><see cref="JsonSerializerDefaults.Web"/> as base configuration</description></item>
     ///   <item><description><see cref="DefaultJsonTypeInfoResolver"/> for type resolution</description></item>
-    ///   <item><description><see cref="PropertyNameCaseInsensitive"/> = true for case-insensitive parsing</description></item>
-    ///   <item><description><see cref="DefaultIgnoreCondition.WhenWritingNull"/> to omit null values</description></item>
-    ///   <item><description><see cref="MaxDepth"/> = 64 for safety</description></item>
+    ///   <item><description><see cref="JsonSerializerOptions.PropertyNameCaseInsensitive"/> = true for case-insensitive parsing</description></item>
+    ///   <item><description><see cref="JsonSerializerOptions.DefaultIgnoreCondition"/> set to <see cref="JsonIgnoreCondition.WhenWritingNull"/> to omit null values</description></item>
+    ///   <item><description><see cref="JsonSerializerOptions.MaxDepth"/> = 64 for safety</description></item>
     /// </list>
     /// </remarks>
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -52,7 +52,7 @@ public static class JsonRendererExtensions
 
     /// <summary>
     /// Creates a new <see cref="JsonSerializerOptions"/> instance based on the shared contract,
-    /// optionally overriding the <see cref="WriteIndented"/> setting.
+    /// optionally overriding the <see cref="JsonSerializerOptions.WriteIndented"/> setting.
     /// </summary>
     /// <param name="indented">Whether to format the JSON with indentation for readability.</param>
     /// <returns>A new <see cref="JsonSerializerOptions"/> instance.</returns>

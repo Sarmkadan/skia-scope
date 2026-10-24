@@ -3,8 +3,10 @@ using SkiaSharp;
 
 namespace SkiaScope;
 
+/// <summary>Console self-checks for <c>GridRenderer</c>; run them with <c>Run()</c>.</summary>
 public static class GridRendererTests
 {
+    /// <summary>Executes every check in this class and throws on the first failure.</summary>
     public static void Run()
     {
         Console.WriteLine("Running GridRendererTests...");

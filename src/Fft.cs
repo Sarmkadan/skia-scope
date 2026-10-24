@@ -138,7 +138,7 @@ public sealed class Fft
     /// </exception>
     public void ComputeMagnitudeSpectrum(ReadOnlySpan<float> samples, Span<float> magnitudes)
     {
-        if (samples == null || samples.Length == 0)
+        if (samples.Length == 0)
         {
             throw new ArgumentException("Input samples cannot be empty", nameof(samples));
         }
