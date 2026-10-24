@@ -332,7 +332,8 @@ public static class FftTests
     {
         Console.WriteLine(" Testing single sample input...");
 
-        var fft = new Fft(1024);
+        // Hann window is zero at index 0, which would zero out the lone sample; use no window here.
+        var fft = new Fft(1024, FftWindow.None);
         var singleSample = new float[1] { 1.0f };
 
         var magnitudes = fft.ComputeMagnitudeSpectrum(singleSample);
