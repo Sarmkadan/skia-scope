@@ -27,14 +27,34 @@ public sealed class CompositeScopeRenderer : IScopeRenderer
     private int _sampleRate;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="CompositeScopeRenderer"/> class.
+    /// Initializes a new instance of the <see cref="CompositeScopeRenderer"/> class with default options.
     /// </summary>
     /// <param name="theme">The initial theme to apply to this renderer and all its children.</param>
     /// <exception cref="ArgumentNullException">Thrown if theme is null.</exception>
     public CompositeScopeRenderer(ScopeTheme theme)
+        : this(theme, new CompositeScopeOptions())
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CompositeScopeRenderer"/> class with the given options.
+    /// </summary>
+    /// <param name="theme">The initial theme to apply to this renderer and all its children.</param>
+    /// <param name="options">The startup options. They are validated before the renderer is created.</param>
+    /// <exception cref="ArgumentNullException">Thrown if theme or options is null.</exception>
+    /// <exception cref="CompositeScopeOptionsException">Thrown if the options fail validation. The exception lists every violation.</exception>
+    public CompositeScopeRenderer(ScopeTheme theme, CompositeScopeOptions options)
     {
         _theme = theme ?? throw new ArgumentNullException(nameof(theme));
+        ArgumentNullException.ThrowIfNull(options);
+        options.EnsureValid();
+        Options = options;
     }
+
+    /// <summary>
+    /// Gets the validated options this renderer was created with.
+    /// </summary>
+    public CompositeScopeOptions Options { get; }
 
     /// <inheritdoc/>
     /// <exception cref="ArgumentNullException">Thrown if value is null.</exception>

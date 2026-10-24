@@ -21,6 +21,13 @@ Gets the lookup table (LUT) containing the collection of colors defining this co
 - Parameters: None.
 - Throws: None.
 
+### StopCount
+`public int StopCount`
+Gets the number of color stops defining this color map.
+- Returns: An `int`.
+- Parameters: None.
+- Throws: None.
+
 ### Viridis
 `public static ColorMap Viridis`
 Gets a predefined `ColorMap` instance using the Viridis color scheme.

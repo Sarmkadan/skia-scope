@@ -25,6 +25,7 @@ SkiaScope.AutoTriggerTests.Run();
 SkiaScope.CorrelationMeterTests.Run();
 SkiaScope.VuMeterTests.Run();
 SkiaScope.OscilloscopeRendererTests.Run();
+SkiaScope.CompositeScopeOptionsTests.Run();
 ```
 
 Benchmark: `SpectrogramRendererBenchmark.RunBenchmark(int[] historyLengths, int iterations)`.

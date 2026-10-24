@@ -44,6 +44,11 @@ public sealed class ColorMap
     }
 
     /// <summary>
+    /// Gets the number of color stops defining this color map.
+    /// </summary>
+    public int StopCount => _stops.Length;
+
+    /// <summary>
     /// Maps a value to a color based on the color stops in this color map.
     /// </summary>
     /// <remarks>
