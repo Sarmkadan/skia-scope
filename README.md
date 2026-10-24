@@ -213,6 +213,7 @@ Run it with `dotnet run`. The working directory receives `frames/frame-00.png` t
 | Member | Default | Description |
 |---|---|---|
 | `ColorMap(SKColor[] stops)` | Required, at least 2 stops | Stops are spaced evenly over [0, 1]. |
+| `ColorMap(ColorStop[] stops)` | Required | Explicit positions. Must pass `ColorMap.Validate`, otherwise throws `InvalidColorMapException`. |
 | `Map(float value)` | No default | Clamps to [0, 1]. NaN, +∞ and −∞ return the sentinel colors below. |
 | `ToLut(int size)` | Required, `size > 0` | Returns `size` colors sampled evenly over [0, 1]. |
 | `NaNSentinelColor` | `#FF00FF` (magenta) | Read-only static. |

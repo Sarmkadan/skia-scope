@@ -28,6 +28,26 @@ Gets the number of color stops defining this color map.
 - Parameters: None.
 - Throws: None.
 
+### Stops
+`public IReadOnlyList<ColorStop> Stops`
+Gets the color stops defining this color map, ordered by position.
+- Returns: A read-only list of `ColorStop`.
+- Parameters: None.
+- Throws: None.
+
+### Validate
+`public static void Validate(IReadOnlyList<ColorStop> stops)`
+Checks stops against the rules required by `ColorMap`. The constructor applies the same check.
+- Rules, checked in order:
+  1. At least two stops.
+  2. Each position is a finite number in [0, 1]. A stop at exactly 1.0 is allowed.
+  3. Positions are sorted in ascending order.
+  4. No two stops share a position.
+  5. The first stop is at position 0.
+  6. The last stop is at position 1.
+- Parameters: `stops` - the stops to check.
+- Throws: `ArgumentNullException` if `stops` is null. `InvalidColorMapException` on the first violated rule. Its `Index` property is the offending stop's index, or -1 when there are too few stops.
+
 ### Viridis
 `public static ColorMap Viridis`
 Gets a predefined `ColorMap` instance using the Viridis color scheme.
